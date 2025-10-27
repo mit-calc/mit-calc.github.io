@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chasing Compute - Foundation Model Research</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <header class="site-header">
@@ -14,8 +14,9 @@
             </div>
             <ul class="nav-links">
                 <li><a href="#home">Home</a></li>
-                <li><a href="#research">Research</a></li>
-                <li><a href="#discussion">Discussion</a></li>
+                <li><a href="{{ url_for('index_page') }}#research">Research</a></li>
+                <li><a href="{{ url_for('index_page') }}#discussion">Discussion</a></li>
+                <li><a href="{{ url_for('search_page') }}">Check Your Info</a></li>
             </ul>
         </nav>
     </header>

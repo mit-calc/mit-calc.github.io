@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chasing Compute - Foundation Model Research</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <header class="site-header">
+        <nav class="main-nav">
+            <div class="logo">
+                <h1>Chasing Compute</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="{{ url_for('index_page') }}#research">Research</a></li>
+                <li><a href="{{ url_for('index_page') }}#discussion">Discussion</a></li>
+                <li><a href="{{ url_for('search_page') }}">Check Your Info</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Static HTML -->
+    <main>
+        <section id="search" class="search-section">
+            <div class="split-container">
+                <div class="left-panel">
+                    <h2>Find Your Research Papers</h2>
+                    <p>Enter your name to see which papers you've contributed to:</p>
+
+                    <!-- User puts in their name here. -->
+                    <form id="searchForm">
+                        <input type="text" id="nameInput" placeholder="Enter your name">
+                        <button type="submit">Search</button>
+                    </form>
+
+                    <!-- Display a list of papers associated with user. -->
+                    <div id="results"></div>
+                </div>
+
+                <div class="right-panel">
+                    <h2>Paper Details</h2>
+                    <!-- After clicking on a paper title, its info shows up here. -->
+                    <div id="paper-details"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        let currentPaperIndex = null;
+
+        const form = document.getElementById('searchForm');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            lookup();
+        });
+
+        // User submits name -> Look for associated papers
+        async function lookup() {
+            const name = document.getElementById('nameInput').value.trim();
+            const resultsDiv = document.getElementById('results');  // Left side panel
+            const detailsDiv = document.getElementById('paper-details');  // Right side panel
+
+            resultsDiv.innerHTML = "Searching...";
+            detailsDiv.innerHTML = `<p>Select a paper from the list to view its details.</p>`;
+
+            const response = await fetch('/query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                return;
+            }
+
+            if (data.papers.length === 0) {
+                resultsDiv.innerHTML = `<p>No papers found for <b>${name}</b>.</p>`;
+                return;
+            }
+
+            // Update list of papers after user enters a name.
+            const list = data.papers
+                .map(p => `<li data-index="${p.index}" onclick="showDetails(${p.index})">${p.title}</li>`)
+                .join('');
+            resultsDiv.innerHTML = `
+                <h3>Papers for ${name}</h3>
+                <ul>${list}</ul>
+            `;
+        }
+
+        // User clicks on paper title -> Display paper's info on right side
+        async function showDetails(index){
+            // Update the current paper index so we save the right one!
+            currentPaperIndex = index;
+
+            const detailsDiv = document.getElementById('paper-details');
+            detailsDiv.innerHTML = "<p>Loading...</p>";
+
+            // Give index to Flask, get the paper's details
+            const response = await fetch('/paper_details', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({index})
+            });
+
+            const data = await response.json();
+
+            detailsDiv.innerHTML = `
+                <h3>Basic Info</h3>
+                <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
+                <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
+                <div class="field"><h4>Year</h4><p class="value">${data["Year"] || "N/A"}</p></div>
+            `;
+
+            const sections = [
+                {
+                    heading: "GPU Info",
+                    fields: ["GPU Number", "GPU Type", "GPU Storage", "Inference Time"]
+                },
+                {
+                    heading: "LLM Info",
+                    fields: ["LLM(s) FineTuning", "LLM(s) Evaluation"]
+                },
+                {
+                    heading: "Funding Info",
+                    fields: ["API Cost", "Funding Resource", "Funding Type"]
+                }
+            ];
+
+            function createFieldHTML(label, value) {
+                return `
+                    <div class="field">
+                        <span class="label"><b>${label}:</b></span>
+                        <span class="value">${value}</span>
+                        <br>
+                        <input type="text" class="correction" placeholder="Correct this value if wrong">
+                    </div>
+                `;
+            }
+
+            function displayPaperInfo(data) {
+                const detailsDiv = document.getElementById('paper-details');
+                let html = "";
+
+                sections.forEach(section => {
+                    html += `<h3>${section.heading}</h3>`;
+                    section.fields.forEach(field => {
+                        const value = data[field] || "N/A";
+                        html += createFieldHTML(field, value);
+                    });
+                });
+
+                detailsDiv.innerHTML += html;
+            }
+            displayPaperInfo(data);
+
+            const existingButton = document.getElementById('submitCorrections');
+            if (!existingButton) {
+                const submitButton = document.createElement('button');
+                submitButton.id = 'submitCorrections';
+                submitButton.textContent = 'Submit Corrections';
+                detailsDiv.appendChild(submitButton);
+
+                submitButton.addEventListener('click', () => {
+                    submitCorrections();
+                });
+            }
+        }
+        
+        const submitButton = document.getElementById('submitCorrections');
+
+        // Press "Submit Corrections" -> Saves corrected data
+        async function submitCorrections() {
+            const corrections = {};
+
+            document.querySelectorAll('.field').forEach(f => {
+                const input = f.querySelector('.correction');
+                if (input && input.value.trim() !== "") {
+                    const labelEl = f.querySelector('.label');
+                    const fieldName = labelEl ? labelEl.textContent.replace(":", "").trim() : null;
+                    if (fieldName) {
+                        corrections[fieldName] = input.value.trim();
+                    }
+                }
+            });
+
+            // Quick test print to terminal
+            const payload = { paper_index: currentPaperIndex, corrections };
+            console.log("Submitting payload:", payload);
+
+            const response = await fetch('/submit_corrections', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    paper_index: currentPaperIndex,
+                    corrections: corrections,
+                    user_name: document.getElementById('nameInput').value
+                })
+            });
+
+            const data = await response.json();
+            console.log("Server response:", data);
+            alert("Corrections submitted!");
+        }
+
+    </script>
+</body>
+</html>

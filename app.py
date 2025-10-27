@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import pandas as pd
 from data_retrieve import df, biblios
 import gspread
+import os, json
 from google.oauth2.service_account import Credentials
 
 # Connect to Google Sheets
@@ -9,7 +10,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = Credentials.from_service_account_file("../money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
+creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
+creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+# creds = Credentials.from_service_account_file("../money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
 client = gspread.authorize(creds)
 
 # Open spreadsheet uding Google API

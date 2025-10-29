@@ -159,6 +159,17 @@
                     });
                 });
 
+                html += `
+                    <h3>Additional Comments</h3>
+                    <div class="field">
+                        <textarea 
+                            id="additional-comments" 
+                            class="comment-box" 
+                            placeholder="Share any additional comments below..."
+                        ></textarea>
+                    </div>
+                `;
+
                 detailsDiv.innerHTML += html;
             }
             displayPaperInfo(data);
@@ -192,6 +203,9 @@
                     }
                 }
             });
+
+            corrections["Share any additional comments below:"] =
+            document.getElementById('additional-comments').value.trim() || "N/A";
 
             // Quick test print to terminal
             const payload = { paper_index: currentPaperIndex, corrections };

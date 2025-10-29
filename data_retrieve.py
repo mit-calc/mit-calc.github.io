@@ -3,8 +3,11 @@ import ast
 
 # Get .csv version of the spreadsheet.
 # NOTE: This assumes that the data is in a Google Sheets file.
-# NOTE: This is just the first five rows of the original data.
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1vw1LWtZ7A1_aa_WI_psgIo4Lo9X3jyC9XB4NAMbSBYg/export?format=csv"
+
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1Y6I57HlmI9wd2iwQUQGaj1vFO2scPF48XB3osrUhXAA/export?format=csv"
+
+# Dummy database - use for testing.
+# SHEET_URL = "https://docs.google.com/spreadsheets/d/1vw1LWtZ7A1_aa_WI_psgIo4Lo9X3jyC9XB4NAMbSBYg/export?format=csv"
 
 df = pd.read_csv(SHEET_URL)
 

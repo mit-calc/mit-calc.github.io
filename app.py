@@ -10,13 +10,17 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+
+# * This is for hosting on Render. Ignore this if running locally. *
 creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
 creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+
 # creds = Credentials.from_service_account_file("../money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
+
 client = gspread.authorize(creds)
 
 # Open spreadsheet uding Google API
-SHEET_NAME = "dummy_data"
+SHEET_NAME = "data_overview_3_9"
 sheet = client.open(SHEET_NAME)
 corrections_tab = sheet.worksheet("User_Corrections")
 
@@ -48,7 +52,7 @@ def query():
     papers = [{'index': idx, 'title': title} for idx, title in biblios[name]]
     return jsonify({'papers': papers})
 
-# Retrieve the selected paper's details.
+# Retrieve the selected paper's information.
 @app.route('/paper_details', methods=['POST'])
 def paper_details():
     data = request.get_json()
@@ -76,7 +80,6 @@ def paper_details():
         else:
             paper_info[f] = str(v)
 
-    # Optional: rename keys to match what your JS expects
     paper_info = {
         "Title": paper_info.get("title"),
         "Authors": paper_info.get("authors"),
@@ -115,14 +118,15 @@ def submit_corrections():
         corrections.get("LLM(s) Evaluation", "N/A"),
         corrections.get("API Cost", "N/A"),
         corrections.get("Funding Resource", "N/A"),
-        corrections.get("Funding Type", "N/A")
+        corrections.get("Funding Type", "N/A"),
+        corrections.get("Share any additional comments below:", "N/A")
     ]
 
     # Append to the corrections tab
     corrections_tab.append_row(row)
 
-    print("Added correction:", row)
+    # print("Added correction:", row)
     return jsonify({'success': True, 'message': 'Correction submitted successfully'})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)

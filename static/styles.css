@@ -698,11 +698,23 @@ section h2::after {
     padding-bottom: 5px;
 }
 
+.comment-box {
+  width: 100%;
+  min-height: 100px;
+  max-height: 300px;
+  resize: vertical;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
 #submitCorrections {
     display: block;
     margin: 20px auto;
     padding: 15px 30px;
-    font-size: 18px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: rgba(15, 23, 42, 0.9);
     color: white;
     border: none;

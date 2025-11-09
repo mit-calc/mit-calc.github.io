@@ -666,9 +666,14 @@ section h2::after {
     margin-top: 0;
 }
 
-.left-panel,
+.left-panel {
+    flex: 0 0 30%;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
 .right-panel {
-    flex: 1;
+    flex: 0 0 70%;
     padding: 2rem;
     overflow-y: auto;
 }
@@ -682,20 +687,170 @@ section h2::after {
     background-color: #fafafa;
 }
 
-#results li {
+#searchForm {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+}
+
+#nameInput, .correction { /* nameInput and correction are both input text boxes - should look the same! */
+    width: 250px;
+    height: 35px;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 10px;
+}
+
+/* Submit button for name search */
+#submitName {
+    width: 100px;
+    height: 35px;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 10px;
+    text-align: center;
+    align-items: center;
+    color: white;
+    background-color: #374c7de6;
+    border: none
+}
+
+#submitName:hover {
+    background-color: #1e2c4ee6
+}
+
+#paper-list li {
   cursor: pointer;
   transition: color 0.2s ease;
 }
 
-#results li:hover {
+#paper-list li:hover {
   color: #0056b3;
 }
 
 #paper-details h3 {
+    font-size: 25 px;
     text-align: center;
     margin-top: 30px;
     border-bottom: 1px solid #ccc;
     padding-bottom: 5px;
+}
+
+.field {
+padding: 8px;
+}
+
+.label, .value {
+    font-size: 18px;
+}
+
+.gpu-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.gpu-info-table th,
+.gpu-info-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.gpu-info-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.gpu-info-table input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.no-gpus-button {
+    width: 250px;
+    height: 35px;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 10px;
+    margin: 10px 0;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.no-gpus-button:hover {
+    background-color: #e0e0e0;
+}
+
+.no-gpus-button.active {
+    background-color: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+
+.funding-dropdown {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.eligibility-box {
+    background-color: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 10px 0 20px 0;
+}
+
+.eligibility-box ul {
+    margin-left: 20px;
+}
+
+.eligibility-box li {
+    margin: 5px 0;
+}
+
+.eligibility-confirm {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.eligibility-confirm input {
+    margin-right: 8px;
+    width: 18px;
+    height: 18px;
+}
+
+.confirm-section-btn {
+    display: block;
+    margin: 20px auto;
+    margin-top: 30px;
+    padding: 15px 30px;
+    font-size: 20px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #374c7de6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.confirm-section-btn:hover {
+    background-color: #1e2c4ee6;
+}
+
+.confirm-section-btn.confirmed {
+    background-color: #d4edda;
+    border-color: #28a745;
+    color: #155724;
 }
 
 .comment-box {
@@ -714,6 +869,7 @@ section h2::after {
     display: block;
     margin: 20px auto;
     padding: 15px 30px;
+    font-size: 20px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: rgba(15, 23, 42, 0.9);
     color: white;
@@ -723,7 +879,7 @@ section h2::after {
 }
 
 #submitCorrections:hover {
-    background-color: #94a3b8; /* darker green on hover */
+    background-color: #070d1ee6;
 }
 
 @media (max-width: 900px) {

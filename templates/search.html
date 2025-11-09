@@ -34,11 +34,11 @@
                     <!-- User puts in their name here. -->
                     <form id="searchForm">
                         <input type="text" id="nameInput" placeholder="Enter your name">
-                        <button type="submit">Search</button>
+                        <button type="submit" id="submitName">Search</button>
                     </form>
 
                     <!-- Display a list of papers associated with user. -->
-                    <div id="results"></div>
+                    <div id="paper-list"></div>
                 </div>
 
                 <div class="right-panel">
@@ -60,14 +60,16 @@
             lookup();
         });
 
+        let properUserName = '';  // User's name (capitalized properly, for data-saving purposes)
+
         // User submits name -> Look for associated papers
         async function lookup() {
             const name = document.getElementById('nameInput').value.trim();
-            const resultsDiv = document.getElementById('results');  // Left side panel
-            const detailsDiv = document.getElementById('paper-details');  // Right side panel
+            const leftDiv = document.getElementById('paper-list');  // Left side panel
+            const rightDiv = document.getElementById('paper-details');  // Right side panel
 
-            resultsDiv.innerHTML = "Searching...";
-            detailsDiv.innerHTML = `<p>Select a paper from the list to view its details.</p>`;
+            leftDiv.innerHTML = "Searching...";
+            rightDiv.innerHTML = `<p>Click on a paper from the list to view its details.</p>`;
 
             const response = await fetch('/query', {
                 method: 'POST',
@@ -77,35 +79,108 @@
 
             const data = await response.json();
 
+            if (data.name) {
+                properUserName = data.name;
+            }
+
             if (data.error) {
-                resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                leftDiv.innerHTML = `<p class="error">${data.error}</p>`;
                 return;
             }
 
             if (data.papers.length === 0) {
-                resultsDiv.innerHTML = `<p>No papers found for <b>${name}</b>.</p>`;
+                leftDiv.innerHTML = `<p>No papers found for <b>${name}</b>.</p>`;
                 return;
             }
 
-            // Update list of papers after user enters a name.
+            // Update left panel.
             const list = data.papers
                 .map(p => `<li data-index="${p.index}" onclick="showDetails(${p.index})">${p.title}</li>`)
                 .join('');
-            resultsDiv.innerHTML = `
-                <h3>Papers for ${name}</h3>
+            leftDiv.innerHTML = `
+                <h3>Papers with ${properUserName}</h3>
                 <ul>${list}</ul>
             `;
         }
 
+        // "No GPUs Used" Button
+        function toggleNoGPUs() {
+            const btn = document.getElementById('no-gpus-btn');
+            const isActive = btn.classList.contains('active');
+            
+            if (isActive) {
+                document.querySelectorAll('.gpu-input').forEach(input => {
+                    input.disabled = false;
+                    input.style.backgroundColor = '';
+                });
+                btn.textContent = 'No GPUs Used';
+                btn.classList.remove('active');
+            } else {
+                document.querySelectorAll('.gpu-input').forEach(input => {
+                    input.value = '';
+                    input.disabled = true;
+                    input.style.backgroundColor = '#f5f5f5';
+                });
+                btn.textContent = 'No GPUs Used ✓';
+                btn.classList.add('active');
+            }
+        }
+
+        let gpuChecked = false;
+        let llmChecked = false;
+        let fundingChecked = false;
+
+        function confirmGPUSection() {
+            const btn = document.getElementById('confirm-gpu-btn');
+            gpuChecked = !gpuChecked;
+            
+            if (gpuChecked) {
+                btn.textContent = 'GPU Info Verified ✓';
+                btn.classList.add('confirmed');
+            } else {
+                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.classList.remove('confirmed');
+            }
+        }
+
+        function confirmLLMSection() {
+            const btn = document.getElementById('confirm-llm-btn');
+            llmChecked = !llmChecked;
+            
+            if (llmChecked) {
+                btn.textContent = 'LLM Info Verified ✓';
+                btn.classList.add('confirmed');
+            } else {
+                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.classList.remove('confirmed');
+            }
+        }
+
+        function confirmFundingSection() {
+            const btn = document.getElementById('confirm-funding-btn');
+            fundingChecked = !fundingChecked;
+            
+            if (fundingChecked) {
+                btn.textContent = 'Funding Info Verified ✓';
+                btn.classList.add('confirmed');
+            } else {
+                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.classList.remove('confirmed');
+            }
+        }
+
         // User clicks on paper title -> Display paper's info on right side
         async function showDetails(index){
-            // Update the current paper index so we save the right one!
+            // Resets the section check buttons
+            gpuChecked = false;
+            llmChecked = false;
+            fundingChecked = false;
+
             currentPaperIndex = index;
 
             const detailsDiv = document.getElementById('paper-details');
             detailsDiv.innerHTML = "<p>Loading...</p>";
 
-            // Give index to Flask, get the paper's details
             const response = await fetch('/paper_details', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -119,20 +194,90 @@
                 <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
                 <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
                 <div class="field"><h4>Year</h4><p class="value">${data["Year"] || "N/A"}</p></div>
+                
+                <h3>Eligibility Criteria</h3>
+                <div class="eligibility-box">
+                    <p><b>READ BEFORE SUBMITTING!</b> Please confirm your paper meets ALL of the following criteria:</p>
+                    <ul>
+                        <li>You are the first author or co-first author of this paper.</li>
+                        <li>The project is completed.</li>
+                        <li>The project works with Large Language Models (LLM) ONLY.</li>
+                        <li>This work is primarily in the CS domain.</li>
+                        <li>This work is NOT a survey paper.</li>
+                        <li>You made sure that the information you entered is accurate. We will check the quality of your answers before sending any compensation.</li>
+                    </ul>
+                    <p><b>You can only submit revised information for a maximum of five papers. All inputs are optional, 
+                        so only submit information that you know is correct.</b></p>
+                    <label class="eligibility-confirm">
+                        <input type="checkbox" id="eligibility-checkbox">
+                        <span>I confirm this paper meets all eligibility criteria above</span>
+                    </label>
+                </div>
+            `;
+
+            const gpuTypes = [
+                "NVIDIA Tesla V100",
+                "NVIDIA Tesla A100",
+                "NVIDIA Tesla P100",
+                "NVIDIA Tesla A40",
+                "NVIDIA Tesla A800",
+                "NVIDIA Tesla A4000",
+                "NVIDIA Tesla A5000",
+                "NVIDIA Tesla H100",
+                "NVIDIA Tesla A6000",
+                "Nvidia GeForce RTX 3090",
+                "Nvidia GeForce RTX 4090",
+                "Others"
+            ];
+
+            // GPU Info as table
+            
+            let gpuTableHTML = `
+                <h3>GPU Info</h3>
+                <button id="no-gpus-btn" class="no-gpus-button" onclick="toggleNoGPUs()">No GPUs Used</button>
+                <table class="gpu-info-table">
+                    <thead>
+                        <tr>
+                            <th>GPU Type</th>
+                            <th>GPU Number</th>
+                            <th>GPU Storage</th>
+                            <th>Inference Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            gpuTypes.forEach(gpuType => {
+                gpuTableHTML += `
+                    <tr>
+                        <td>${gpuType}</td>
+                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Number" placeholder=""></td>
+                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Storage" placeholder=""></td>
+                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="Inference Time" placeholder=""></td>
+                    </tr>
+                `;
+            });
+
+            gpuTableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            detailsDiv.innerHTML += gpuTableHTML;
+
+            detailsDiv.innerHTML += `
+                <button id="confirm-gpu-btn" class="confirm-section-btn" onclick="confirmGPUSection()">
+                    I checked that all information I wrote in this section is correct.
+                </button>
             `;
 
             const sections = [
-                {
-                    heading: "GPU Info",
-                    fields: ["GPU Number", "GPU Type", "GPU Storage", "Inference Time"]
-                },
                 {
                     heading: "LLM Info",
                     fields: ["LLM(s) FineTuning", "LLM(s) Evaluation"]
                 },
                 {
                     heading: "Funding Info",
-                    fields: ["API Cost", "Funding Resource", "Funding Type"]
+                    fields: ["API Cost", "Funding Resource"]
                 }
             ];
 
@@ -147,31 +292,67 @@
                 `;
             }
 
-            function displayPaperInfo(data) {
-                const detailsDiv = document.getElementById('paper-details');
-                let html = "";
+        function displayPaperInfo(data) {
+            const detailsDiv = document.getElementById('paper-details');
+            let html = "";
 
-                sections.forEach(section => {
-                    html += `<h3>${section.heading}</h3>`;
-                    section.fields.forEach(field => {
-                        const value = data[field] || "N/A";
-                        html += createFieldHTML(field, value);
-                    });
+            // Display the sections: LLM Info, Funding Info
+            sections.forEach(section => {
+                html += `<h3>${section.heading}</h3>`;
+                section.fields.forEach(field => {
+                    const value = data[field] || "N/A";
+                    html += createFieldHTML(field, value);
                 });
+                
+                // Add Funding Type dropdown after Funding Info section
+                if (section.heading === "Funding Info") {
+                    html += `
+                        <div class="field">
+                            <span class="label"><b>Funding Type:</b></span>
+                            <span class="value">${data["Funding Type"] || "N/A"}</span>
+                            <br>
+                            <select class="correction funding-dropdown">
+                                <option value="">Select funding type...</option>
+                                <option value="Corporate">Corporate</option>
+                                <option value="Government">Government</option>
+                                <option value="Foundation">Foundation</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                    `;
+                }
 
-                html += `
-                    <h3>Additional Comments</h3>
-                    <div class="field">
-                        <textarea 
-                            id="additional-comments" 
-                            class="comment-box" 
-                            placeholder="Share any additional comments below..."
-                        ></textarea>
-                    </div>
-                `;
+                if (section.heading === "LLM Info") {
+                    html += `
+                        <button id="confirm-llm-btn" class="confirm-section-btn" onclick="confirmLLMSection()">
+                            I checked that all information I wrote in this section is correct
+                        </button>
+                    `;
+                }
+                
+                if (section.heading === "Funding Info") {
+                    html += `
+                        <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
+                            I checked that all information I wrote in this section is correct
+                        </button>
+                    `;
+                }
+            });
 
-                detailsDiv.innerHTML += html;
-            }
+            // Additional Comments box
+            html += `
+                <h3>Additional Comments</h3>
+                <div class="field">
+                    <textarea 
+                        id="additional-comments" 
+                        class="comment-box" 
+                        placeholder="Share any additional comments below..."
+                    ></textarea>
+                </div>
+            `;
+
+            detailsDiv.innerHTML += html;
+        }
             displayPaperInfo(data);
 
             const existingButton = document.getElementById('submitCorrections');
@@ -191,8 +372,56 @@
 
         // Press "Submit Corrections" -> Saves corrected data
         async function submitCorrections() {
+            // Check eligibility first
+            const eligibilityChecked = document.getElementById('eligibility-checkbox');
+            if (!eligibilityChecked || !eligibilityChecked.checked) {
+                alert("Please confirm the paper meets all eligibility criteria before submitting.");
+                return;
+            }
+            
             const corrections = {};
+            
+            // Add confirmation flags
+            corrections["GPU CHECKED"] = gpuChecked ? "Checked" : "N/A";
+            corrections["LLM CHECKED"] = llmChecked ? "Checked" : "N/A";
+            corrections["Funding CHECKED"] = fundingChecked ? "Checked" : "N/A";
 
+            // Check if "No GPUs Used" is active
+            const noGpusBtn = document.getElementById('no-gpus-btn');
+            
+            const noGpusUsed = noGpusBtn && noGpusBtn.classList.contains('active');
+
+            if (noGpusUsed) {
+                corrections["GPU Number"] = "0";
+                corrections["GPU Type"] = "None";
+                corrections["GPU Storage"] = "0";
+            } else {
+                // Handle GPU table inputs - create separate entries for each GPU type with data
+                const gpuInputs = document.querySelectorAll('.gpu-input');
+                const gpuDataByType = {};
+                
+                gpuInputs.forEach(input => {
+                    if (input.value.trim()) {
+                        const gpuType = input.dataset.gpuType;
+                        const field = input.dataset.field;
+                        
+                        if (!gpuDataByType[gpuType]) {
+                            gpuDataByType[gpuType] = {};
+                        }
+                        gpuDataByType[gpuType][field] = input.value.trim();
+                    }
+                });
+                
+                // Add GPU data to corrections with indexed keys
+                Object.entries(gpuDataByType).forEach(([gpuType, data], index) => {
+                    corrections[`GPU Type ${index + 1}`] = gpuType;
+                    if (data["GPU Number"]) corrections[`GPU Number ${index + 1}`] = data["GPU Number"];
+                    if (data["GPU Storage"]) corrections[`GPU Storage ${index + 1}`] = data["GPU Storage"];
+                    if (data["Inference Time"]) corrections[`Inference Time ${index + 1}`] = data["Inference Time"];
+                });
+            }
+
+            // Handle other fields (LLM, Funding) - keep existing logic
             document.querySelectorAll('.field').forEach(f => {
                 const input = f.querySelector('.correction');
                 if (input && input.value.trim() !== "") {
@@ -207,9 +436,7 @@
             corrections["Share any additional comments below:"] =
             document.getElementById('additional-comments').value.trim() || "N/A";
 
-            // Quick test print to terminal
             const payload = { paper_index: currentPaperIndex, corrections };
-            console.log("Submitting payload:", payload);
 
             const response = await fetch('/submit_corrections', {
                 method: 'POST',
@@ -217,7 +444,7 @@
                 body: JSON.stringify({
                     paper_index: currentPaperIndex,
                     corrections: corrections,
-                    user_name: document.getElementById('nameInput').value
+                    user_name: properUserName
                 })
             });
 

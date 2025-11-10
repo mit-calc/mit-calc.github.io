@@ -4,6 +4,8 @@ from data_retrieve import df, biblios
 import gspread
 import os, json
 from google.oauth2.service_account import Credentials
+from datetime import datetime
+import pytz
 
 # Connect to Google Sheets
 SCOPES = [
@@ -11,11 +13,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# # * This is for hosting on Render. Ignore this if running locally. *
-# creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
-# creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+# * This is for hosting on Render. Ignore this if running locally. *
+creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
+creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
-creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
+# creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
 
 client = gspread.authorize(creds)
 
@@ -29,7 +31,7 @@ app = Flask(__name__)
 # Pre-load name:paper map for case-insensitive queries
 biblios_lower = {k.lower(): k for k in biblios.keys()}
 
-# Render `search.html` file when 
+# Render `search.html` file. 
 @app.route('/search')
 def search_page():
     return render_template('search.html')
@@ -51,11 +53,12 @@ def query():
     if key is None:
         return jsonify({'error': 'Name not in database'})
 
+    # papers_list is list of tuples (paper_idx, paper_title, paper_id)
     papers_list = biblios[key]
     if len(papers_list) == 0:
         return jsonify({'error': 'Your name is in our database, but no papers came up.'})
 
-    papers = [{'index': idx, 'title': title} for idx, title in papers_list]
+    papers = [{'index': idx, 'title': title, 'id': id} for idx, title, id in papers_list]
     return jsonify({'papers': papers, 'name': key})
 
 # Retrieve the selected paper's information.
@@ -86,6 +89,7 @@ def paper_details():
         else:
             paper_info[f] = str(v)
 
+    # Info about the paper that gets pulled from the spreadsheet onto the website.
     paper_info = {
         "Title": paper_info.get("title"),
         "Authors": paper_info.get("authors"),
@@ -96,46 +100,29 @@ def paper_details():
         "Inference Time": paper_info.get("Inference time"),
         "LLM(s) FineTuning": paper_info.get("LLM(s) FineTuning"),
         "LLM(s) Evaluation": paper_info.get("LLM(s) Evaluation"),
-        "API Cost": paper_info.get("API Cost (i.e. model testing, and iterative retraining)"),
+        "API Cost (USD $)": paper_info.get("API Cost (i.e. model testing, and iterative retraining)"),
         "Funding Resource": paper_info.get("Funding Resource"),
         "Funding Type": paper_info.get("Funding Type")
     }
     return jsonify(paper_info)
 
-# Receive user's corrections
+
 @app.route('/submit_corrections', methods=['POST'])
 def submit_corrections():
     data = request.get_json()
     paper_index = data.get('paper_index')
+    paper_id = data.get('paper_id')
     corrections = data.get('corrections', {})
     user_name = data.get('user_name', 'Anonymous')
+
+    # Add timestamp
+    est = pytz.timezone('US/Eastern')
+    timestamp = datetime.now(est).strftime('%Y-%m-%d %H:%M:%S')
 
     if paper_index is None:
         return jsonify({'error': 'No paper index provided'}), 400
 
-    # Check if "No GPUs Used" was submitted
-    if corrections.get("GPU Number") == "0" and corrections.get("GPU Type") == "None" and corrections.get("GPU Storage") == "0":
-        row = [
-            paper_index,
-            user_name,
-            "0",  # GPU Number
-            "None",  # GPU Type
-            "0",  # GPU Storage
-            "N/A",  # Inference Time
-            corrections.get("GPU CHECKED", "N/A"),
-            corrections.get("LLM(s) FineTuning", "N/A"),
-            corrections.get("LLM(s) Evaluation", "N/A"),
-            corrections.get("LLM CHECKED", "N/A"),
-            corrections.get("API Cost", "N/A"),
-            corrections.get("Funding Resource", "N/A"),
-            corrections.get("Funding Type", "N/A"),
-            corrections.get("Funding CHECKED", "N/A"),
-            corrections.get("Share any additional comments below:", "N/A")
-        ]
-        corrections_tab.append_row(row)
-        return jsonify({'success': True, 'message': 'Correction submitted successfully'})
-
-    # Extract GPU data - find all indexed GPU entries
+    # Extract GPU data
     gpu_entries = {}
     for key, value in corrections.items():
         if key.startswith('GPU Type '):
@@ -159,47 +146,44 @@ def submit_corrections():
                 gpu_entries[index] = {}
             gpu_entries[index]['inference_time'] = value
 
-    # If no GPU entries found, add one row with N/A
-    if not gpu_entries:
+    # Determine GPU info values based on "No GPUs Used" button
+    if corrections.get("GPU Number") == "0" and corrections.get("GPU Type") == "None" and corrections.get("GPU Storage") == "0":
+        gpu_rows = [{"number": "0", "type": "None", "storage": "0", "inference_time": "N/A"}]
+    elif gpu_entries:
+        gpu_rows = [
+            {
+                "number": gpu_data.get('number', 'N/A'),
+                "type": gpu_data.get('type', 'N/A'),
+                "storage": gpu_data.get('storage', 'N/A'),
+                "inference_time": gpu_data.get('inference_time', 'N/A')
+            }
+            for _, gpu_data in gpu_entries.items()
+        ]
+    else:
+        gpu_rows = [{"number": "N/A", "type": "N/A", "storage": "N/A", "inference_time": "N/A"}]
+
+    # Submit row(s) to corrections log. (One row for each GPU type used)
+    for gpu_row in gpu_rows:
         row = [
+            paper_id,
             paper_index,
             user_name,
-            "N/A",  # GPU Number
-            "N/A",  # GPU Type
-            "N/A",  # GPU Storage
-            "N/A",  # Inference Time
+            gpu_row["number"],
+            gpu_row["type"],
+            gpu_row["storage"],
+            gpu_row["inference_time"],
             corrections.get("GPU CHECKED", "N/A"),
             corrections.get("LLM(s) FineTuning", "N/A"),
             corrections.get("LLM(s) Evaluation", "N/A"),
             corrections.get("LLM CHECKED", "N/A"),
-            corrections.get("API Cost", "N/A"),
+            corrections.get("API Cost (USD $)", "N/A"),
             corrections.get("Funding Resource", "N/A"),
             corrections.get("Funding Type", "N/A"),
             corrections.get("Funding CHECKED", "N/A"),
-            corrections.get("Share any additional comments below:", "N/A")
+            corrections.get("Share any additional comments below:", "N/A"),
+            timestamp
         ]
         corrections_tab.append_row(row)
-    else:
-        # Add one row per GPU type
-        for _, gpu_data in gpu_entries.items():
-            row = [
-                paper_index,
-                user_name,
-                gpu_data.get('number', 'N/A'),
-                gpu_data.get('type', 'N/A'),
-                gpu_data.get('storage', 'N/A'),
-                gpu_data.get('inference_time', 'N/A'),
-                corrections.get("GPU CHECKED", "N/A"),  # Add this
-                corrections.get("LLM(s) FineTuning", "N/A"),
-                corrections.get("LLM(s) Evaluation", "N/A"),
-                corrections.get("LLM CHECKED", "N/A"),  # Add this
-                corrections.get("API Cost", "N/A"),
-                corrections.get("Funding Resource", "N/A"),
-                corrections.get("Funding Type", "N/A"),
-                corrections.get("Funding CHECKED", "N/A"),  # Add this
-                corrections.get("Share any additional comments below:", "N/A")
-            ]
-            corrections_tab.append_row(row)
 
     return jsonify({'success': True, 'message': 'Correction submitted successfully'})
 

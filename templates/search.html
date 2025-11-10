@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chasing Compute - Foundation Model Research</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='multiselect.js') }}"></script>
 </head>
 
 <body>
@@ -53,6 +54,9 @@
     <!-- JavaScript -->
     <script>
         let currentPaperIndex = null;
+        let currentPaperId = null;
+        let paperIdMap = {};
+        let multiSelectData = {};
 
         const form = document.getElementById('searchForm');
         form.addEventListener('submit', function(e) {
@@ -92,6 +96,12 @@
                 leftDiv.innerHTML = `<p>No papers found for <b>${name}</b>.</p>`;
                 return;
             }
+
+            // Store paper ids.
+            paperIdMap = {};
+            data.papers.forEach(p => {
+                paperIdMap[p.index] = p.id;
+            });
 
             // Update left panel.
             const list = data.papers
@@ -138,7 +148,7 @@
                 btn.textContent = 'GPU Info Verified ✓';
                 btn.classList.add('confirmed');
             } else {
-                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.textContent = 'I checked that all information displayed in this section is correct';
                 btn.classList.remove('confirmed');
             }
         }
@@ -151,7 +161,7 @@
                 btn.textContent = 'LLM Info Verified ✓';
                 btn.classList.add('confirmed');
             } else {
-                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.textContent = 'I checked that all information displayed in this section is correct';
                 btn.classList.remove('confirmed');
             }
         }
@@ -164,10 +174,59 @@
                 btn.textContent = 'Funding Info Verified ✓';
                 btn.classList.add('confirmed');
             } else {
-                btn.textContent = 'I checked that all information I wrote in this section is correct';
+                btn.textContent = 'I checked that all information displayed in this section is correct';
                 btn.classList.remove('confirmed');
             }
         }
+
+        function addMultiSelectTag(fieldId, value, fieldLabel) {
+            // Hide placeholder if it exists
+            const placeholder = document.getElementById(`${fieldId}-placeholder`);
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            const tagsContainer = document.getElementById(`${fieldId}-tags`);
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.innerHTML = `
+                ${value}
+                <button class="tag-remove" onclick="removeMultiSelectTag(this, '${fieldId}', '${value}', '${fieldLabel}')">&times;</button>
+            `;
+            tagsContainer.appendChild(tag);
+        }
+
+        window.removeMultiSelectTag = function(button, fieldId, value, fieldLabel) {
+            multiSelectData[fieldLabel].delete(value);
+            button.parentElement.remove();
+            
+            // Show placeholder if no tags remain
+            const tagsContainer = document.getElementById(`${fieldId}-tags`);
+            const placeholder = document.getElementById(`${fieldId}-placeholder`);
+            if (placeholder && tagsContainer.children.length === 0) {
+                placeholder.style.display = 'block';
+            }
+        };
+
+        // Function to get multi-select values (sorted alphabetically)
+        window.getMultiSelectValues = function(fieldLabel) {
+            const items = Array.from(multiSelectData[fieldLabel] || []);
+            return items.sort().join(', ') || "N/A";
+        };
+
+        // Let user know that API Cost has to be non-negative, 2 decimal places or less
+        window.validateAPICost = function(input) {
+            if (input.value < 0) {
+                input.value = '0';
+                return;
+            }
+            if (input.value.includes('.')) {
+                const parts = input.value.split('.');
+                if (parts[1] && parts[1].length > 2) {
+                    input.value = parseFloat(input.value).toFixed(2);
+                }
+            }
+        };
 
         // User clicks on paper title -> Display paper's info on right side
         async function showDetails(index){
@@ -177,6 +236,7 @@
             fundingChecked = false;
 
             currentPaperIndex = index;
+            currentPaperId = paperIdMap[index];
 
             const detailsDiv = document.getElementById('paper-details');
             detailsDiv.innerHTML = "<p>Loading...</p>";
@@ -189,7 +249,8 @@
 
             const data = await response.json();
 
-            detailsDiv.innerHTML = `
+            // Build all HTML first
+            let fullHTML = `
                 <h3>Basic Info</h3>
                 <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
                 <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
@@ -231,23 +292,28 @@
             ];
 
             // GPU Info as table
-            
-            let gpuTableHTML = `
+            fullHTML += `
                 <h3>GPU Info</h3>
+                <div style="margin-bottom: 15px; line-height: 1.8;">
+                    <div><b>GPU Type:</b> ${data["GPU Type"] || "N/A"}</div>
+                    <div><b>GPU Number:</b> ${data["GPU Number"] || "N/A"}</div>
+                    <div><b>GPU Storage:</b> ${data["GPU Storage"] || "N/A"}</div>
+                    <div><b>Inference Time:</b> ${data["Inference Time"] || "N/A"}</div>
+                </div>
                 <button id="no-gpus-btn" class="no-gpus-button" onclick="toggleNoGPUs()">No GPUs Used</button>
                 <table class="gpu-info-table">
                     <thead>
                         <tr>
                             <th>GPU Type</th>
                             <th>GPU Number</th>
-                            <th>GPU Storage</th>
-                            <th>Inference Time</th>
+                            <th>GPU Storage (GB)</th>
+                            <th>Inference Time (seconds)</th>
                         </tr>
                     </thead>
                     <tbody>`;
 
             gpuTypes.forEach(gpuType => {
-                gpuTableHTML += `
+                fullHTML += `
                     <tr>
                         <td>${gpuType}</td>
                         <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Number" placeholder=""></td>
@@ -257,16 +323,11 @@
                 `;
             });
 
-            gpuTableHTML += `
+            fullHTML += `
                     </tbody>
                 </table>
-            `;
-
-            detailsDiv.innerHTML += gpuTableHTML;
-
-            detailsDiv.innerHTML += `
                 <button id="confirm-gpu-btn" class="confirm-section-btn" onclick="confirmGPUSection()">
-                    I checked that all information I wrote in this section is correct.
+                    I checked that all information displayed in this section is correct.
                 </button>
             `;
 
@@ -277,11 +338,64 @@
                 },
                 {
                     heading: "Funding Info",
-                    fields: ["API Cost", "Funding Resource"]
+                    fields: ["API Cost (USD $)", "Funding Resource", "Funding Type"]
                 }
             ];
 
             function createFieldHTML(label, value) {
+                // Check if this field should be a multi-select
+                if (MULTI_SELECT_CONFIG[label]) {
+                    const config = MULTI_SELECT_CONFIG[label];
+                    const fieldId = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                    
+                    const options = config.options.map(option => 
+                        `<option value="${option}">${option}</option>`
+                    ).join('');
+
+                    // Check if there's existing data
+                    const hasData = value && value !== "N/A";
+                    const placeholderHTML = hasData ? '' : '<span class="no-info-placeholder" id="' + fieldId + '-placeholder">Select choices from drop-down menu.</span>';
+                                
+                    return `
+                        <div class="field">
+                            <span class="label"><b>${label}:</b></span>
+                            <span class="value">${value}</span>
+                            <div class="multi-select-container">
+                                ${placeholderHTML}
+                                <div class="selected-tags" id="${fieldId}-tags"></div>
+                                <select class="multi-select-dropdown" id="${fieldId}-dropdown">
+                                    <option value="">${config.placeholder}</option>
+                                    ${options}
+                                </select>
+                                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                    <input type="text" 
+                                        id="${fieldId}-custom-input" 
+                                        class="custom-input" 
+                                        placeholder="Or type a custom value">
+                                    <button class="add-custom-btn" id="${fieldId}-add-btn">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (label === "API Cost (USD $)") {
+                    return `
+                        <div class="field">
+                            <span class="label"><b>${label}:</b></span>
+                            <span class="value">${value}</span>
+                            <br>
+                            <input type="number" 
+                                class="correction api-cost-input" 
+                                placeholder="Enter numerical amount" 
+                                min="0" 
+                                step="0.01"
+                                oninput="validateAPICost(this)">
+                        </div>
+                    `;
+                }
+                
+                // Original handling for other fields
                 return `
                     <div class="field">
                         <span class="label"><b>${label}:</b></span>
@@ -292,55 +406,33 @@
                 `;
             }
 
-        function displayPaperInfo(data) {
-            const detailsDiv = document.getElementById('paper-details');
-            let html = "";
-
-            // Display the sections: LLM Info, Funding Info
+            // Build sections HTML
             sections.forEach(section => {
-                html += `<h3>${section.heading}</h3>`;
+                fullHTML += `<h3>${section.heading}</h3>`;
                 section.fields.forEach(field => {
                     const value = data[field] || "N/A";
-                    html += createFieldHTML(field, value);
+                    fullHTML += createFieldHTML(field, value);
                 });
-                
-                // Add Funding Type dropdown after Funding Info section
-                if (section.heading === "Funding Info") {
-                    html += `
-                        <div class="field">
-                            <span class="label"><b>Funding Type:</b></span>
-                            <span class="value">${data["Funding Type"] || "N/A"}</span>
-                            <br>
-                            <select class="correction funding-dropdown">
-                                <option value="">Select funding type...</option>
-                                <option value="Corporate">Corporate</option>
-                                <option value="Government">Government</option>
-                                <option value="Foundation">Foundation</option>
-                                <option value="Others">Others</option>
-                            </select>
-                        </div>
-                    `;
-                }
 
                 if (section.heading === "LLM Info") {
-                    html += `
+                    fullHTML += `
                         <button id="confirm-llm-btn" class="confirm-section-btn" onclick="confirmLLMSection()">
-                            I checked that all information I wrote in this section is correct
+                            I checked that all information displayed in this section is correct
                         </button>
                     `;
                 }
                 
                 if (section.heading === "Funding Info") {
-                    html += `
+                    fullHTML += `
                         <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
-                            I checked that all information I wrote in this section is correct
+                            I checked that all information displayed in this section is correct
                         </button>
                     `;
                 }
             });
 
             // Additional Comments box
-            html += `
+            fullHTML += `
                 <h3>Additional Comments</h3>
                 <div class="field">
                     <textarea 
@@ -349,19 +441,63 @@
                         placeholder="Share any additional comments below..."
                     ></textarea>
                 </div>
+                <button id="submitCorrections">Submit Corrections</button>
             `;
 
-            detailsDiv.innerHTML += html;
-        }
-            displayPaperInfo(data);
+            // Set all HTML at once
+            detailsDiv.innerHTML = fullHTML;
 
-            const existingButton = document.getElementById('submitCorrections');
-            if (!existingButton) {
-                const submitButton = document.createElement('button');
-                submitButton.id = 'submitCorrections';
-                submitButton.textContent = 'Submit Corrections';
-                detailsDiv.appendChild(submitButton);
+            // Now initialize multi-select fields
+            Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
+                const fieldId = fieldLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                const fieldValue = data[fieldLabel] || "";
+                const selectedItems = new Set();
+                
+                // Store reference
+                multiSelectData[fieldLabel] = selectedItems;
+                
+                // Parse existing values and add them as tags
+                if (fieldValue && fieldValue !== "N/A") {
+                    const items = fieldValue.split(',').map(item => item.trim());
+                    items.forEach(item => {
+                        if (item) {
+                            selectedItems.add(item);
+                            addMultiSelectTag(fieldId, item, fieldLabel);
+                        }
+                    });
+                }
+                
+                // Handle dropdown selection
+                const dropdown = document.getElementById(`${fieldId}-dropdown`);
+                if (dropdown) {
+                    dropdown.addEventListener('change', function() {
+                        const value = this.value;
+                        if (value && !selectedItems.has(value)) {
+                            selectedItems.add(value);
+                            addMultiSelectTag(fieldId, value, fieldLabel);
+                        }
+                        this.value = '';
+                    });
+                }
+                
+                // Handle custom input button click
+                const customInput = document.getElementById(`${fieldId}-custom-input`);
+                const addButton = document.getElementById(`${fieldId}-add-btn`);
+                if (customInput && addButton) {
+                    addButton.addEventListener('click', function() {
+                        const value = customInput.value.trim();
+                        if (value && !selectedItems.has(value)) {
+                            selectedItems.add(value);
+                            addMultiSelectTag(fieldId, value, fieldLabel);
+                        }
+                        customInput.value = '';
+                    });
+                }
+            });
 
+            // Add submit button event listener
+            const submitButton = document.getElementById('submitCorrections');
+            if (submitButton) {
                 submitButton.addEventListener('click', () => {
                     submitCorrections();
                 });
@@ -388,7 +524,6 @@
 
             // Check if "No GPUs Used" is active
             const noGpusBtn = document.getElementById('no-gpus-btn');
-            
             const noGpusUsed = noGpusBtn && noGpusBtn.classList.contains('active');
 
             if (noGpusUsed) {
@@ -396,7 +531,7 @@
                 corrections["GPU Type"] = "None";
                 corrections["GPU Storage"] = "0";
             } else {
-                // Handle GPU table inputs - create separate entries for each GPU type with data
+                // Handle GPU table inputs
                 const gpuInputs = document.querySelectorAll('.gpu-input');
                 const gpuDataByType = {};
                 
@@ -421,27 +556,32 @@
                 });
             }
 
-            // Handle other fields (LLM, Funding) - keep existing logic
+            // Handle multi-select fields (alphabetically sorted)
+            Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
+                corrections[fieldLabel] = window.getMultiSelectValues(fieldLabel);
+            });
+
+            // Handle other regular text fields (but skip multi-select fields)
             document.querySelectorAll('.field').forEach(f => {
                 const input = f.querySelector('.correction');
                 if (input && input.value.trim() !== "") {
                     const labelEl = f.querySelector('.label');
                     const fieldName = labelEl ? labelEl.textContent.replace(":", "").trim() : null;
-                    if (fieldName) {
+                    // Only add if it's not a multi-select field
+                    if (fieldName && !MULTI_SELECT_CONFIG[fieldName]) {
                         corrections[fieldName] = input.value.trim();
                     }
                 }
             });
 
             corrections["Share any additional comments below:"] =
-            document.getElementById('additional-comments').value.trim() || "N/A";
-
-            const payload = { paper_index: currentPaperIndex, corrections };
+                document.getElementById('additional-comments').value.trim() || "N/A";
 
             const response = await fetch('/submit_corrections', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
+                    paper_id: currentPaperId,
                     paper_index: currentPaperIndex,
                     corrections: corrections,
                     user_name: properUserName

@@ -20,11 +20,12 @@ def author_to_paper(df):
 
   Returns:
     author_to_paper (dict): Author's first and last name for the key (str) -> List of tuples with
-    paper's index in the dataset (int) and paper's title (str).
+    paper's index in the dataset (int), paper's title (str), and paper's id (str)
   '''
   
   author_to_paper = {}
 
+  # For each paper, turn its list of authors (which are strings) into Python lists.
   for idx, author_list_str in enumerate(df["authors"]):
     if pd.isna(author_list_str) is False:  # Ignore nan values.
         if author_list_str[0] == "[":
@@ -32,13 +33,16 @@ def author_to_paper(df):
         else:
           paper_authors = author_list_str.split(", ")
 
+        # Retrieve the paper's title (str) and id (str).
         paper_title = df.iloc[idx]["title"]
+        paper_id = df.iloc[idx]["id"]
 
+        # Update each author's entry in author_to_paper.
         for paper_author in paper_authors:
           if paper_author not in author_to_paper:
-            author_to_paper[paper_author] = [(idx, paper_title)]
+            author_to_paper[paper_author] = [(idx, paper_title, paper_id)]
           else:
-            author_to_paper[paper_author].append((idx, paper_title))
+            author_to_paper[paper_author].append((idx, paper_title, paper_id))
   return author_to_paper
 
 biblios = author_to_paper(df)

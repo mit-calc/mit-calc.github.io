@@ -13,11 +13,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# * This is for hosting on Render. Ignore this if running locally. *
-creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
-creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+# # * FOR HOSTING ON RENDER *
+# creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
+# creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
-# creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
+# * FOR RUNNING LOCALLY *
+creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
 
 client = gspread.authorize(creds)
 
@@ -31,14 +32,22 @@ app = Flask(__name__)
 # Pre-load name:paper map for case-insensitive queries
 biblios_lower = {k.lower(): k for k in biblios.keys()}
 
+
 # Render `search.html` file. 
 @app.route('/search')
 def search_page():
     return render_template('search.html')
 
+
 @app.route('/')
 def index_page():
     return render_template('index.html')
+
+
+@app.route('/community')
+def community_page():
+    return render_template('community.html')
+
 
 # Return a list of the user's papers when they search their name.
 @app.route('/query', methods=['POST'])
@@ -60,6 +69,7 @@ def query():
 
     papers = [{'index': idx, 'title': title, 'id': id} for idx, title, id in papers_list]
     return jsonify({'papers': papers, 'name': key})
+
 
 # Retrieve the selected paper's information.
 @app.route('/paper_details', methods=['POST'])
@@ -105,6 +115,73 @@ def paper_details():
         "Funding Type": paper_info.get("Funding Type")
     }
     return jsonify(paper_info)
+
+
+@app.route('/api/updates')
+def get_updates():
+    try:
+        # Get all corrections from Google Sheets
+        corrections_data = corrections_tab.get_all_records()
+        
+        if not corrections_data:
+            return jsonify([])
+        
+        # Convert to DataFrame for easier processing
+        corrections_df = pd.DataFrame(corrections_data)
+        
+        # Sort by timestamp (most recent first)
+        if 'Timestamp' in corrections_df.columns:
+            corrections_df = corrections_df.sort_values('Timestamp', ascending=False)
+        
+        # Build updates list
+        updates = []
+        for _, correction in corrections_df.iterrows():
+            paper_idx = correction.get('Paper Index')
+            
+            # Get paper info from df
+            paper_info = {}
+            if pd.notna(paper_idx) and 0 <= int(paper_idx) < len(df):
+                paper_row = df.iloc[int(paper_idx)]
+                paper_info = {
+                    'title': paper_row.get('title', 'Untitled'),
+                    'authors': paper_row.get('authors', 'Unknown'),
+                    'year': paper_row.get('year', 'N/A'),
+                    'domain': paper_row.get('Domain ARR', ''),
+                    'phase': paper_row.get('Phase ARR', ''),
+                    'method': paper_row.get('Method ARR', '')
+                }
+
+            # Get additional comments - try different possible column names
+            comments = ''
+            for possible_key in ['Share any additional comments below:', 'Additional Comments', 'Comments']:
+                if possible_key in correction and pd.notna(correction[possible_key]) and str(correction[possible_key]).strip() not in ['', 'N/A']:
+                    comments = str(correction[possible_key])
+                    break
+            
+            # Build corrections dict (only non-empty fields)
+            correction_fields = {}
+            for key, value in correction.items():
+                if key not in ['Paper ID', 'Paper Index', 'User Name', 'Timestamp'] and pd.notna(value) and str(value).strip() not in ['', 'N/A']:
+                    correction_fields[key] = str(value)
+            
+            update = {
+                'paper_title': paper_info.get('title', 'Untitled'),
+                'paper_authors': paper_info.get('authors', 'Unknown'),
+                'paper_year': str(paper_info.get('year', 'N/A')),
+                'domain': '' if pd.isna(paper_row.get('Domain ARR')) else str(paper_row.get('Domain ARR', '')),
+                'phase': '' if pd.isna(paper_row.get('Phase ARR')) else str(paper_row.get('Phase ARR', '')),
+                'method': '' if pd.isna(paper_row.get('Method ARR')) else str(paper_row.get('Method ARR', '')),
+                'modified_by': correction.get('User Name', 'Anonymous'),
+                'modified_date': correction.get('Timestamp', ''),
+                'additional_comments': comments,
+                'corrections': correction_fields
+            }
+            updates.append(update)
+        
+        return jsonify(updates)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/submit_corrections', methods=['POST'])

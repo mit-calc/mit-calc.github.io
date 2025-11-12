@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Updates - Chasing Compute</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .updates-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .update-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .update-header {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .update-header h2 {
+            margin: 0 0 0.5rem 0;
+            color: #333;
+            font-size: 1.3rem;
+        }
+        
+        .update-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            flex-wrap: wrap;
+        }
+        
+        .update-meta span {
+            white-space: nowrap;
+        }
+        
+        .update-meta strong {
+            color: #333;
+        }
+        
+        .modification-info {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.75rem;
+        }
+        
+        .modification-info strong {
+            color: #333;
+        }
+        
+        .additional-comments {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #eee;
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.5;
+        }
+        
+        .additional-comments strong {
+            color: #333;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="site-header">
+        <nav class="main-nav">
+            <div class="logo">
+                <h1>Chasing Compute</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('index_page') }}">Home</a></li>
+                <li><a href="{{ url_for('index_page') }}#research">Research</a></li>
+                <li><a href="{{ url_for('index_page') }}#discussion">Discussion</a></li>
+                <li><a href="{{ url_for('search_page') }}">Check Your Info</a></li>
+                <li><a href="{{ url_for('community_page') }}">Community</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="updates-container">
+            <h1>Latest Paper Updates</h1>
+            <div id="updates-list" class="loading">Loading updates...</div>
+        </div>
+    </main>
+
+    <script>
+        async function loadUpdates() {
+            try {
+                const response = await fetch('/api/updates');
+                const updates = await response.json();
+                
+                const container = document.getElementById('updates-list');
+                
+                if (updates.length === 0) {
+                    container.innerHTML = '<p>No updates found.</p>';
+                    return;
+                }
+
+                container.innerHTML = updates.map(update => {
+                    // Get additional comments
+                    const comments = update.corrections['Share any additional comments below:'] || '';
+
+                    return `
+                        <div class="update-card">
+                            <div class="update-header">
+                                <h2>${update.paper_title}</h2>
+                                <div class="update-meta">
+                                    <span><strong>Authors:</strong> ${update.paper_authors}</span>
+                                    <span><strong>Published:</strong> ${update.paper_year}</span>
+                                    ${update.paper_domain ? `<span><strong>Domain:</strong> ${update.paper_domain}</span>` : ''}
+                                    ${update.paper_phase ? `<span><strong>Phase:</strong> ${update.paper_phase}</span>` : ''}
+                                    ${update.paper_method ? `<span><strong>Method:</strong> ${update.paper_method}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="modification-info">
+                                <span><strong>Modified by:</strong> ${update.modified_by}</span>
+                                <span><strong>Modified:</strong> ${new Date(update.modified_date).toLocaleDateString()}</span>
+                            </div>
+                            ${update.additional_comments ? `
+                                <div class="additional-comments">
+                                    <strong>Additional Comments:</strong>
+                                    ${update.additional_comments}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                document.getElementById('updates-list').innerHTML = 
+                    `<p>Error loading updates: ${error.message}</p>`;
+            }
+        }
+
+        loadUpdates();
+    </script>
+</body>
+</html>

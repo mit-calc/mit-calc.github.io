@@ -962,6 +962,9 @@ padding: 8px;
     margin-bottom: 6px;
 }
 
+/* === COMMUNITY PAGE === */
+
+
 @media (max-width: 900px) {
     .split-container {
         flex-direction: column;

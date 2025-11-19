@@ -689,6 +689,7 @@ section h2::after {
 
 #searchForm {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 10px;
 }
@@ -701,11 +702,20 @@ section h2::after {
     border-radius: 10px;
 }
 
+#titleInput {
+    width: 250px;
+    height: 35px;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+}
+
 /* "Check Your Info" dropdown suggestions */
 .search-container {
     position: relative;
     display: inline-block;
-    width: 100%;
+    width: 250px;
 }
 
 .suggestions-dropdown {
@@ -1285,6 +1295,25 @@ padding: 8px;
 .community-pagination .ellipsis:hover {
     color: #007bff;
     font-weight: bold;
+}
+
+.community-search-filters {
+    margin-bottom: 1rem;
+    flex-shrink: 0;
+}
+
+.community-search-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.community-search-input:focus {
+    outline: none;
+    border-color: #007bff;
 }
 
 @media (max-width: 900px) {

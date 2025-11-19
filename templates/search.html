@@ -33,12 +33,21 @@
                     <h2>Find Your Research Papers</h2>
                     <p>Enter your name to see which papers you've contributed to:</p>
 
-                    <!-- User puts in their name here. -->
+                    <!-- User puts in their name and paper title here. -->
                     <form id="searchForm">
-                        <div class="search-container">
-                            <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off">
-                            <div id="suggestions" class="suggestions-dropdown"></div>
+                        <div style="margin-bottom: 0.5rem;">
+                            <label for="nameInput" style="display: block; font-weight: bold; margin-bottom: 0.25rem; font-size: 0.95rem;">Author Name (required):</label>
+                            <div class="search-container">
+                                <input type="text" id="nameInput" placeholder="Enter author name" autocomplete="off">
+                                <div id="suggestions" class="suggestions-dropdown"></div>
+                            </div>
                         </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label for="titleInput" style="display: block; font-weight: bold; margin-bottom: 0.25rem; font-size: 0.95rem;">Paper Title:</label>
+                            <input type="text" id="titleInput" placeholder="Enter paper title" autocomplete="off">
+                        </div>
+                        
                         <button type="submit" id="submitName">Search</button>
                     </form>
 
@@ -73,8 +82,15 @@
         // User submits name -> Look for associated papers
         async function lookup() {
             const name = document.getElementById('nameInput').value.trim();
+            const titleQuery = document.getElementById('titleInput').value.trim().toLowerCase();
             const leftDiv = document.getElementById('paper-list');  // Left side panel
             const rightDiv = document.getElementById('paper-details');  // Right side panel
+
+            // Check if at least one search field is filled
+            if (!name && !titleQuery) {
+                leftDiv.innerHTML = `<p class="error">Please enter an author name or paper title to search.</p>`;
+                return;
+            }
 
             leftDiv.innerHTML = "Searching...";
             rightDiv.innerHTML = `<p>Click on a paper from the list to view its details.</p>`;
@@ -101,18 +117,41 @@
                 return;
             }
 
-            // Store paper ids.
+            // Store paper ids
             paperIdMap = {};
             data.papers.forEach(p => {
                 paperIdMap[p.index] = p.id;
             });
 
-            // Update left panel.
-            const list = data.papers
+            // Filter papers by title if title search is provided
+            let filteredPapers = data.papers;
+            if (titleQuery) {
+                filteredPapers = data.papers.filter(p => 
+                    p.title.toLowerCase().includes(titleQuery)
+                );
+            }
+
+            if (filteredPapers.length === 0) {
+                leftDiv.innerHTML = `<p>No papers found matching your search criteria.</p>`;
+                return;
+            }
+
+            // Update left panel with filtered results
+            const list = filteredPapers
                 .map(p => `<li data-index="${p.index}" onclick="showDetails(${p.index})">${p.title}</li>`)
                 .join('');
+            
+            let headerText = '';
+            if (name && titleQuery) {
+                headerText = `Papers by ${properUserName} matching "${titleQuery}"`;
+            } else if (name) {
+                headerText = `Papers with ${properUserName}`;
+            } else {
+                headerText = `Papers matching "${titleQuery}"`;
+            }
+            
             leftDiv.innerHTML = `
-                <h3>Papers with ${properUserName}</h3>
+                <h3>${headerText}</h3>
                 <ul>${list}</ul>
             `;
         }
@@ -174,9 +213,12 @@
         // "No GPUs Used" Button
         function toggleNoGPUs() {
             const btn = document.getElementById('no-gpus-btn');
+            const table = document.querySelector('.gpu-info-table');
             const isActive = btn.classList.contains('active');
             
             if (isActive) {
+                // Show table again
+                table.style.display = '';
                 document.querySelectorAll('.gpu-input').forEach(input => {
                     input.disabled = false;
                     input.style.backgroundColor = '';
@@ -184,6 +226,8 @@
                 btn.textContent = 'No GPUs Used';
                 btn.classList.remove('active');
             } else {
+                // Hide table
+                table.style.display = 'none';
                 document.querySelectorAll('.gpu-input').forEach(input => {
                     input.value = '';
                     input.disabled = true;

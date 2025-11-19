@@ -27,6 +27,10 @@
         <div class="community-split-container">
             <div class="community-left-panel">
                 <h1>All Papers</h1>
+                <div class="community-search-filters">
+                    <input type="text" id="author-search" class="community-search-input" placeholder="Search by author name...">
+                    <input type="text" id="title-search" class="community-search-input" placeholder="Search by paper title...">
+                </div>
                 <div class="community-papers-scroll">
                     <div id="papers-list" class="community-loading">Loading papers...</div>
                     <div id="pagination" class="community-pagination"></div>
@@ -44,6 +48,7 @@
 
     <script>
         let allPapers = [];
+        let filteredPapers = [];
         let selectedPaperId = null;
         let currentPage = 1;
         const papersPerPage = 30;
@@ -67,6 +72,9 @@
                 allPapers = papers.sort((a, b) => 
                     a.paper_title.localeCompare(b.paper_title)
                 );
+                
+                // Initially show all papers
+                filteredPapers = [...allPapers];
 
                 // Display first page
                 displayPage(1);
@@ -78,17 +86,51 @@
             }
         }
 
+        function filterPapers() {
+            const authorQuery = document.getElementById('author-search').value.toLowerCase().trim();
+            const titleQuery = document.getElementById('title-search').value.toLowerCase().trim();
+            
+            filteredPapers = allPapers.filter(paper => {
+                const matchesAuthor = !authorQuery || 
+                    paper.paper_authors.toLowerCase().includes(authorQuery);
+                const matchesTitle = !titleQuery || 
+                    paper.paper_title.toLowerCase().includes(titleQuery);
+                
+                return matchesAuthor && matchesTitle;
+            });
+            
+            // Reset to first page when filtering
+            displayPage(1);
+        }
+
+        // Add event listeners for search inputs
+        document.getElementById('author-search').addEventListener('input', filterPapers);
+        document.getElementById('title-search').addEventListener('input', filterPapers);
+
         function displayPage(pageNum) {
             currentPage = pageNum;
             
             const startIdx = (pageNum - 1) * papersPerPage;
             const endIdx = startIdx + papersPerPage;
-            const pagePapers = allPapers.slice(startIdx, endIdx);
+            const pagePapers = filteredPapers.slice(startIdx, endIdx);
             
             const container = document.getElementById('papers-list');
             
+            if (filteredPapers.length === 0) {
+                container.innerHTML = '<p>No papers match your search criteria.</p>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+            
             // Display papers for current page
             container.innerHTML = pagePapers.map((paper, index) => {
+                // Format timestamp to only show date
+                let displayDate = 'N/A';
+                if (paper.timestamp && paper.timestamp !== 'N/A') {
+                    // Extract just the date part (yyyy-mm-dd)
+                    displayDate = paper.timestamp.split(' ')[0];
+                }
+                
                 // Build category badges HTML
                 let categoryBadges = '';
                 if (paper.domain && paper.domain !== 'N/A') {
@@ -119,7 +161,7 @@
                         <hr class="community-card-divider">
                         <div class="community-modification-info">
                             <strong>Last update made by:</strong> ${paper.last_update}
-                            ${paper.timestamp && paper.timestamp !== 'N/A' ? ` on ${paper.timestamp}` : ''}
+                            ${displayDate !== 'N/A' ? ` on ${displayDate}` : ''}
                         </div>
                         ${commentsHTML}
                     </div>
@@ -134,7 +176,7 @@
         }
 
         function displayPagination() {
-            const totalPages = Math.ceil(allPapers.length / papersPerPage);
+            const totalPages = Math.ceil(filteredPapers.length / papersPerPage);
             const paginationContainer = document.getElementById('pagination');
             
             if (totalPages <= 1) {
@@ -228,7 +270,7 @@
         }
 
         function changePage(pageNum) {
-            const totalPages = Math.ceil(allPapers.length / papersPerPage);
+            const totalPages = Math.ceil(filteredPapers.length / papersPerPage);
             
             if (pageNum < 1 || pageNum > totalPages) {
                 return;
@@ -260,8 +302,6 @@
                 const response = await fetch(`/api/paper_info/${paperId}`);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
                     throw new Error('Failed to load paper details');
                 }
                 

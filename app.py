@@ -6,6 +6,7 @@ import os, json
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
 import pytz
+import threading
 
 # Connect to Google Sheets
 SCOPES = [
@@ -313,14 +314,14 @@ def get_paper_info(paper_id):
     result = {}
     for key, value in paper_info.items():
         if isinstance(value, list):
-            # Handle lists - convert each element to string
+            # Handle lists - keep as list but clean each element
             cleaned_list = []
             for item in value:
                 if pd.isna(item):
                     cleaned_list.append("N/A")
                 else:
                     cleaned_list.append(str(item))
-            result[key] = cleaned_list
+            result[key] = cleaned_list  # Keep as list, not comma-separated string
         elif pd.isna(value):
             result[key] = "N/A"
         else:
@@ -409,9 +410,7 @@ def submit_corrections():
         ]
         corrections_tab.append_row(row)
 
-    # Force cache refresh after submission
     data_cache['last_updated'] = None
-    get_fresh_data()
 
     return jsonify({'success': True, 'message': 'Correction submitted successfully'})
 

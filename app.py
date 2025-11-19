@@ -1,10 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
-from data_retrieve import df, biblios
+from data_retrieve import df, biblios, paper_updates, author_to_paper, paper_tracker, SHEET_URL, CORRECTIONS_URL
 import gspread
 import os, json
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 # Connect to Google Sheets
@@ -32,6 +32,44 @@ app = Flask(__name__)
 # Pre-load name:paper map for case-insensitive queries
 biblios_lower = {k.lower(): k for k in biblios.keys()}
 
+from datetime import datetime, timedelta
+
+# Cache variables
+data_cache = {
+    'df': None,
+    'df_corrections': None,
+    'paper_updates': None,
+    'biblios': None,
+    'last_updated': None
+}
+CACHE_DURATION = timedelta(minutes=5)  # Cache for 5 minutes
+
+def get_fresh_data():
+    """Get data from cache or reload if cache is stale"""
+    global data_cache
+    
+    now = datetime.now()
+    
+    # Check if cache is valid
+    if (data_cache['last_updated'] is None or 
+        now - data_cache['last_updated'] > CACHE_DURATION):
+        
+        # Reload data
+        print("Reloading data from Google Sheets...")
+        data_cache['df'] = pd.read_csv(SHEET_URL)
+        data_cache['df_corrections'] = pd.read_csv(CORRECTIONS_URL)
+        data_cache['biblios'] = author_to_paper(data_cache['df'])
+        data_cache['paper_updates'] = paper_tracker(data_cache['df'], data_cache['df_corrections'])
+        data_cache['last_updated'] = now
+        print("Data reloaded successfully")
+    
+    return data_cache['paper_updates']
+
+# Initialize cache on startup
+print("Initializing data cache on startup...")
+get_fresh_data()
+print("Cache initialized")
+
 
 # Render `search.html` file. 
 @app.route('/search')
@@ -47,6 +85,27 @@ def index_page():
 @app.route('/community')
 def community_page():
     return render_template('community.html')
+
+
+# Return name suggestions
+@app.route('/suggest_names', methods=['POST'])
+def suggest_names():
+    data = request.get_json()
+    query = data.get('query', '').strip().lower()
+    
+    if not query:
+        return jsonify({'suggestions': []})
+    
+    # Filter names that contain the query string (case-insensitive)
+    matching_names = [
+        name for name in biblios.keys() 
+        if query in name.lower()
+    ]
+    
+    # Limit to top 10 suggestions, sorted alphabetically
+    matching_names = sorted(matching_names)[:10]
+    
+    return jsonify({'suggestions': matching_names})
 
 
 # Return a list of the user's papers when they search their name.
@@ -184,8 +243,96 @@ def get_updates():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/all_papers', methods=['GET'])
+def get_all_papers():
+    """Return all papers with their basic info and last update status"""
+    paper_updates_fresh = get_fresh_data()
+    
+    papers_list = []
+    
+    for paper_id, paper_info in paper_updates_fresh.items():
+        # Handle NaN values by converting to string and checking
+        title = paper_info.get('Title', 'Unknown Title')
+        if pd.isna(title):
+            title = 'Unknown Title'
+            
+        authors = paper_info.get('Authors', 'Unknown Authors')
+        if pd.isna(authors):
+            authors = 'Unknown Authors'
+            
+        last_update = paper_info.get('Last update made by', 'Unknown')
+        if pd.isna(last_update):
+            last_update = 'Unknown'
+            
+        domain = paper_info.get('Domain', 'N/A')
+        if pd.isna(domain):
+            domain = 'N/A'
+            
+        phase = paper_info.get('Phase', 'N/A')
+        if pd.isna(phase):
+            phase = 'N/A'
+            
+        method = paper_info.get('Method', 'N/A')
+        if pd.isna(method):
+            method = 'N/A'
+            
+        timestamp = paper_info.get('Timestamp', 'N/A')
+        if pd.isna(timestamp):
+            timestamp = 'N/A'
+            
+        additional_comments = paper_info.get('Additional Comments', 'N/A')
+        if pd.isna(additional_comments):
+            additional_comments = 'N/A'
+        
+        papers_list.append({
+            'paper_id': str(paper_id),
+            'paper_title': str(title),
+            'paper_authors': str(authors),
+            'last_update': str(last_update),
+            'domain': str(domain),
+            'phase': str(phase),
+            'method': str(method),
+            'timestamp': str(timestamp),
+            'additional_comments': str(additional_comments)
+        })
+    
+    return jsonify(papers_list)
+
+
+@app.route('/api/paper_info/<paper_id>', methods=['GET'])
+def get_paper_info(paper_id):
+    """Return detailed information for a specific paper"""
+    paper_updates_fresh = get_fresh_data()
+    
+    if paper_id not in paper_updates_fresh:
+        return jsonify({'error': 'Paper not found'}), 404
+    
+    paper_info = paper_updates_fresh[paper_id]
+    
+    # Convert all values to strings and handle NaN
+    result = {}
+    for key, value in paper_info.items():
+        if isinstance(value, list):
+            # Handle lists - convert each element to string
+            cleaned_list = []
+            for item in value:
+                if pd.isna(item):
+                    cleaned_list.append("N/A")
+                else:
+                    cleaned_list.append(str(item))
+            result[key] = cleaned_list
+        elif pd.isna(value):
+            result[key] = "N/A"
+        else:
+            result[key] = str(value)
+    
+    return jsonify(result)
+
+
 @app.route('/submit_corrections', methods=['POST'])
 def submit_corrections():
+    global data_cache
+    
     data = request.get_json()
     paper_index = data.get('paper_index')
     paper_id = data.get('paper_id')
@@ -261,6 +408,10 @@ def submit_corrections():
             timestamp
         ]
         corrections_tab.append_row(row)
+
+    # Force cache refresh after submission
+    data_cache['last_updated'] = None
+    get_fresh_data()
 
     return jsonify({'success': True, 'message': 'Correction submitted successfully'})
 

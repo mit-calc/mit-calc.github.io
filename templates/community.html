@@ -5,83 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Updates - Chasing Compute</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        .updates-container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-        }
-        
-        .update-card {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .update-header {
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        
-        .update-header h2 {
-            margin: 0 0 0.5rem 0;
-            color: #333;
-            font-size: 1.3rem;
-        }
-        
-        .update-meta {
-            display: flex;
-            gap: 1.5rem;
-            font-size: 0.85rem;
-            color: #666;
-            flex-wrap: wrap;
-        }
-        
-        .update-meta span {
-            white-space: nowrap;
-        }
-        
-        .update-meta strong {
-            color: #333;
-        }
-        
-        .modification-info {
-            display: flex;
-            gap: 2rem;
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 0.75rem;
-        }
-        
-        .modification-info strong {
-            color: #333;
-        }
-        
-        .additional-comments {
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid #eee;
-            font-size: 0.9rem;
-            color: #555;
-            line-height: 1.5;
-        }
-        
-        .additional-comments strong {
-            color: #333;
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #666;
-        }
-    </style>
 </head>
 
 <body>
@@ -100,63 +23,359 @@
         </nav>
     </header>
 
-    <main>
-        <div class="updates-container">
-            <h1>Latest Paper Updates</h1>
-            <div id="updates-list" class="loading">Loading updates...</div>
+    <main style="padding-top: 100px;">
+        <div class="community-split-container">
+            <div class="community-left-panel">
+                <h1>All Papers</h1>
+                <div class="community-papers-scroll">
+                    <div id="papers-list" class="community-loading">Loading papers...</div>
+                    <div id="pagination" class="community-pagination"></div>
+                </div>
+            </div>
+            
+            <div class="community-right-panel">
+                <h1>Paper Details</h1>
+                <div id="paper-details" class="community-paper-details-content">
+                    <p class="community-placeholder-message">Click on a paper from the list to view its details.</p>
+                </div>
+            </div>
         </div>
     </main>
 
     <script>
-        async function loadUpdates() {
+        let allPapers = [];
+        let selectedPaperId = null;
+        let currentPage = 1;
+        const papersPerPage = 30;
+
+        async function loadPapers() {
             try {
-                const response = await fetch('/api/updates');
-                const updates = await response.json();
+                const response = await fetch('/api/all_papers');
                 
-                const container = document.getElementById('updates-list');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
-                if (updates.length === 0) {
-                    container.innerHTML = '<p>No updates found.</p>';
+                const papers = await response.json();
+                
+                if (papers.length === 0) {
+                    document.getElementById('papers-list').innerHTML = '<p>No papers found.</p>';
                     return;
                 }
 
-                container.innerHTML = updates.map(update => {
-                    // Get additional comments
-                    const comments = update.corrections['Share any additional comments below:'] || '';
+                // Store papers and sort alphabetically by title
+                allPapers = papers.sort((a, b) => 
+                    a.paper_title.localeCompare(b.paper_title)
+                );
 
-                    return `
-                        <div class="update-card">
-                            <div class="update-header">
-                                <h2>${update.paper_title}</h2>
-                                <div class="update-meta">
-                                    <span><strong>Authors:</strong> ${update.paper_authors}</span>
-                                    <span><strong>Published:</strong> ${update.paper_year}</span>
-                                    ${update.paper_domain ? `<span><strong>Domain:</strong> ${update.paper_domain}</span>` : ''}
-                                    ${update.paper_phase ? `<span><strong>Phase:</strong> ${update.paper_phase}</span>` : ''}
-                                    ${update.paper_method ? `<span><strong>Method:</strong> ${update.paper_method}</span>` : ''}
-                                </div>
-                            </div>
-                            <div class="modification-info">
-                                <span><strong>Modified by:</strong> ${update.modified_by}</span>
-                                <span><strong>Modified:</strong> ${new Date(update.modified_date).toLocaleDateString()}</span>
-                            </div>
-                            ${update.additional_comments ? `
-                                <div class="additional-comments">
-                                    <strong>Additional Comments:</strong>
-                                    ${update.additional_comments}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                }).join('');
+                // Display first page
+                displayPage(1);
 
             } catch (error) {
-                document.getElementById('updates-list').innerHTML = 
-                    `<p>Error loading updates: ${error.message}</p>`;
+                console.error('Full error:', error);
+                document.getElementById('papers-list').innerHTML = 
+                    `<p>Error loading papers: ${error.message}</p>`;
             }
         }
 
-        loadUpdates();
+        function displayPage(pageNum) {
+            currentPage = pageNum;
+            
+            const startIdx = (pageNum - 1) * papersPerPage;
+            const endIdx = startIdx + papersPerPage;
+            const pagePapers = allPapers.slice(startIdx, endIdx);
+            
+            const container = document.getElementById('papers-list');
+            
+            // Display papers for current page
+            container.innerHTML = pagePapers.map((paper, index) => {
+                // Build category badges HTML
+                let categoryBadges = '';
+                if (paper.domain && paper.domain !== 'N/A') {
+                    categoryBadges += `<span class="community-category-badge">${paper.domain}</span>`;
+                }
+                if (paper.phase && paper.phase !== 'N/A') {
+                    categoryBadges += `<span class="community-category-badge">${paper.phase}</span>`;
+                }
+                if (paper.method && paper.method !== 'N/A') {
+                    categoryBadges += `<span class="community-category-badge">${paper.method}</span>`;
+                }
+                
+                // Build additional comments HTML
+                let commentsHTML = '';
+                if (paper.additional_comments && paper.additional_comments !== 'N/A' && paper.additional_comments.trim() !== '') {
+                    commentsHTML = `<div class="community-additional-comments">"${paper.additional_comments}"</div>`;
+                }
+                
+                return `
+                    <div class="community-update-card" data-paper-id="${paper.paper_id}" onclick="showPaperDetails('${paper.paper_id}')">
+                        <div class="community-update-header">
+                            <h2>${paper.paper_title}</h2>
+                            <div class="community-update-meta">
+                                <span><strong>Authors:</strong> ${paper.paper_authors}</span>
+                            </div>
+                            ${categoryBadges ? `<div class="community-category-badges">${categoryBadges}</div>` : ''}
+                        </div>
+                        <hr class="community-card-divider">
+                        <div class="community-modification-info">
+                            <strong>Last update made by:</strong> ${paper.last_update}
+                            ${paper.timestamp && paper.timestamp !== 'N/A' ? ` on ${paper.timestamp}` : ''}
+                        </div>
+                        ${commentsHTML}
+                    </div>
+                `;
+            }).join('');
+            
+            // Update pagination
+            displayPagination();
+            
+            // Scroll to top of papers list
+            container.scrollTop = 0;
+        }
+
+        function displayPagination() {
+            const totalPages = Math.ceil(allPapers.length / papersPerPage);
+            const paginationContainer = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                paginationContainer.innerHTML = '';
+                return;
+            }
+            
+            let paginationHTML = '';
+            
+            // Previous button
+            paginationHTML += `
+                <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                    ← Previous
+                </button>
+            `;
+            
+            // Page numbers with ellipsis
+            const pageNumbers = getPageNumbers(currentPage, totalPages);
+            
+            pageNumbers.forEach(page => {
+                if (page === '...') {
+                    paginationHTML += `<span class="ellipsis" onclick="goToPage(${totalPages})" title="Jump to page">...</span>`;
+                } else {
+                    paginationHTML += `
+                        <button 
+                            onclick="changePage(${page})" 
+                            class="${page === currentPage ? 'active' : ''}">
+                            ${page}
+                        </button>
+                    `;
+                }
+            });
+            
+            // Next button
+            paginationHTML += `
+                <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                    Next →
+                </button>
+            `;
+            
+            paginationContainer.innerHTML = paginationHTML;
+        }
+
+        function getPageNumbers(current, total) {
+            const pages = [];
+            
+            if (total <= 7) {
+                // Show all pages if 7 or fewer
+                for (let i = 1; i <= total; i++) {
+                    pages.push(i);
+                }
+            } else {
+                // Always show first page
+                pages.push(1);
+                
+                if (current > 3) {
+                    pages.push('...');
+                }
+                
+                // Show pages around current page
+                for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+                    pages.push(i);
+                }
+                
+                if (current < total - 2) {
+                    pages.push('...');
+                }
+                
+                // Always show last page
+                pages.push(total);
+            }
+            
+            return pages;
+        }
+
+        function goToPage(totalPages) {
+            const pageNum = prompt(`Enter page number (1-${totalPages}):`);
+            
+            if (pageNum === null) {
+                return; // User cancelled
+            }
+            
+            const page = parseInt(pageNum);
+            
+            if (isNaN(page) || page < 1 || page > totalPages) {
+                alert(`Please enter a valid page number between 1 and ${totalPages}`);
+                return;
+            }
+            
+            changePage(page);
+        }
+
+        function changePage(pageNum) {
+            const totalPages = Math.ceil(allPapers.length / papersPerPage);
+            
+            if (pageNum < 1 || pageNum > totalPages) {
+                return;
+            }
+            
+            displayPage(pageNum);
+        }
+
+        async function showPaperDetails(paperId) {
+            // Remove previous selection
+            document.querySelectorAll('.community-update-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Add selection to clicked card
+            const selectedCard = document.querySelector(`[data-paper-id="${paperId}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+            
+            selectedPaperId = paperId;
+            
+            // Show loading state
+            const detailsDiv = document.getElementById('paper-details');
+            detailsDiv.innerHTML = '<p class="community-loading">Loading paper details...</p>';
+            
+            try {
+                // Fetch paper details
+                const response = await fetch(`/api/paper_info/${paperId}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error('Failed to load paper details');
+                }
+                
+                const paperInfo = await response.json();
+                
+                // Helper function to create field display
+                function createField(label, value) {
+                    return `<div class="community-paper-field"><b>${label}:</b> ${value}</div>`;
+                }
+                
+                // Helper function to parse value (could be string or list)
+                function parseValue(value) {
+                    if (typeof value === 'string') {
+                        // Try to parse as array if it looks like one
+                        if (value.startsWith('[') && value.endsWith(']')) {
+                            try {
+                                return JSON.parse(value.replace(/'/g, '"'));
+                            } catch {
+                                return [value];
+                            }
+                        }
+                        // Check if it's a comma-separated list
+                        if (value.includes(',')) {
+                            return value.split(',').map(v => v.trim());
+                        }
+                        return [value];
+                    }
+                    return Array.isArray(value) ? value : [value];
+                }
+                
+                // Determine badge class
+                const lastUpdate = paperInfo['Last update made by'] || paperInfo['Last Update'] || 'N/A';
+                const badgeClass = lastUpdate === 'ChatGPT' ? 'chatgpt' : 'user';
+                
+                // Build HTML sections
+                let html = '';
+                
+                // Title and Last Update
+                html += `<h2>${paperInfo['Title'] || 'N/A'}</h2>`;
+                html += `<div class="community-last-update">
+                    Last update made by <span class="community-update-badge ${badgeClass}">${lastUpdate}</span>
+                </div>`;
+                
+                // Basic Info Section (without Title and Last Update)
+                html += `<div class="community-paper-info-section">
+                    <h3>Basic Info</h3>
+                    ${createField('Authors', paperInfo['Authors'] || 'N/A')}
+                    ${createField('Domain', paperInfo['Domain'] || 'N/A')}
+                    ${createField('Phase', paperInfo['Phase'] || 'N/A')}
+                    ${createField('Method', paperInfo['Method'] || 'N/A')}
+                </div>`;
+                
+                // GPU Info Section with table
+                html += `<div class="community-paper-info-section">
+                    <h3>GPU Info</h3>`;
+                
+                const gpuTypes = parseValue(paperInfo['GPU Type'] || 'N/A');
+                const gpuNumbers = parseValue(paperInfo['GPU Number'] || 'N/A');
+                const gpuStorage = parseValue(paperInfo['GPU Storage'] || 'N/A');
+                const inferenceTime = parseValue(paperInfo['Inference Time'] || 'N/A');
+                
+                // Check if we have valid GPU data
+                if (gpuTypes[0] !== 'N/A' && gpuTypes[0] !== '') {
+                    html += `<table class="community-gpu-table">
+                        <thead>
+                            <tr>
+                                <th>GPU Type</th>
+                                <th>GPU Number</th>
+                                <th>GPU Storage</th>
+                                <th>Inference Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                    
+                    for (let i = 0; i < gpuTypes.length; i++) {
+                        html += `<tr>
+                            <td>${gpuTypes[i] || 'N/A'}</td>
+                            <td>${gpuNumbers[i] || 'N/A'}</td>
+                            <td>${gpuStorage[i] || 'N/A'}</td>
+                            <td>${inferenceTime[i] || 'N/A'}</td>
+                        </tr>`;
+                    }
+                    
+                    html += `</tbody></table>`;
+                } else {
+                    html += createField('GPU Info', 'N/A');
+                }
+                
+                html += `</div>`;
+                
+                // LLM Info Section
+                html += `<div class="community-paper-info-section">
+                    <h3>LLM Info</h3>
+                    ${createField('LLM(s) FineTuning', paperInfo['LLM(s) FineTuning'] || 'N/A')}
+                    ${createField('LLM(s) Evaluation', paperInfo['LLM(s) Evaluation'] || 'N/A')}
+                </div>`;
+                
+                // Funding Info Section
+                html += `<div class="community-paper-info-section">
+                    <h3>Funding Info</h3>
+                    ${createField('API Cost', paperInfo['API Cost'] || 'N/A')}
+                    ${createField('Funding Resource', paperInfo['Funding Resource'] || 'N/A')}
+                    ${createField('Funding Type', paperInfo['Funding Type'] || 'N/A')}
+                </div>`;
+                
+                detailsDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading paper details:', error);
+                detailsDiv.innerHTML = '<p class="community-placeholder-message">Error loading paper details.</p>';
+            }
+        }
+
+        loadPapers();
     </script>
 </body>
 </html>

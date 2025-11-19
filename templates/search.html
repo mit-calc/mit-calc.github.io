@@ -35,7 +35,10 @@
 
                     <!-- User puts in their name here. -->
                     <form id="searchForm">
-                        <input type="text" id="nameInput" placeholder="Enter your name">
+                        <div class="search-container">
+                            <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off">
+                            <div id="suggestions" class="suggestions-dropdown"></div>
+                        </div>
                         <button type="submit" id="submitName">Search</button>
                     </form>
 
@@ -114,6 +117,60 @@
             `;
         }
 
+        // Fetch name suggestions from backend
+        async function fetchSuggestions(query) {
+            if (!query.trim()) {
+                return [];
+            }
+            
+            const response = await fetch('/suggest_names', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query})
+            });
+            
+            const data = await response.json();
+            return data.suggestions || [];
+        }
+
+        // Display suggestions
+        function displaySuggestions(suggestions) {
+            const suggestionsDiv = document.getElementById('suggestions');
+            
+            if (suggestions.length === 0) {
+                suggestionsDiv.classList.remove('show');
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = suggestions
+                .map(name => `<div class="suggestion-item" onclick="selectSuggestion('${name.replace(/'/g, "\\'")}')">${name}</div>`)
+                .join('');
+            
+            suggestionsDiv.classList.add('show');
+        }
+
+        // Select a suggestion
+        function selectSuggestion(name) {
+            document.getElementById('nameInput').value = name;
+            document.getElementById('suggestions').classList.remove('show');
+            // Optionally trigger search automatically
+            // lookup();
+        }
+
+        // Add input event listener for real-time suggestions
+        document.getElementById('nameInput').addEventListener('input', async function(e) {
+            const query = e.target.value;
+            const suggestions = await fetchSuggestions(query);
+            displaySuggestions(suggestions);
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('suggestions').classList.remove('show');
+            }
+        });
+
         // "No GPUs Used" Button
         function toggleNoGPUs() {
             const btn = document.getElementById('no-gpus-btn');
@@ -136,6 +193,8 @@
                 btn.classList.add('active');
             }
         }
+
+        // Confirmation information (GPU, LLM, Funding)
 
         let gpuChecked = false;
         let llmChecked = false;
@@ -180,13 +239,13 @@
             }
         }
 
+        // Multiselect widget
         function addMultiSelectTag(fieldId, value, fieldLabel) {
             // Hide placeholder if it exists
             const placeholder = document.getElementById(`${fieldId}-placeholder`);
             if (placeholder) {
                 placeholder.style.display = 'none';
             }
-            
             const tagsContainer = document.getElementById(`${fieldId}-tags`);
             const tag = document.createElement('span');
             tag.className = 'tag';
@@ -200,7 +259,6 @@
         window.removeMultiSelectTag = function(button, fieldId, value, fieldLabel) {
             multiSelectData[fieldLabel].delete(value);
             button.parentElement.remove();
-            
             // Show placeholder if no tags remain
             const tagsContainer = document.getElementById(`${fieldId}-tags`);
             const placeholder = document.getElementById(`${fieldId}-placeholder`);
@@ -215,7 +273,7 @@
             return items.sort().join(', ') || "N/A";
         };
 
-        // Let user know that API Cost has to be non-negative, 2 decimal places or less
+        // API Cost has to be non-negative, and up to 2 decimal places
         window.validateAPICost = function(input) {
             if (input.value < 0) {
                 input.value = '0';
@@ -250,7 +308,7 @@
 
             const data = await response.json();
 
-            // Build all HTML first
+            // Build all HTML first, for displaying paper's info in the right panel
             let fullHTML = `
                 <h3>Basic Info</h3>
                 <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
@@ -292,7 +350,8 @@
                 "Others"
             ];
 
-            // GPU Info as table
+            // GPU Table - User inputs Type, Number, Storage, Inference Time
+            // TODO: Add something where if "No GPUs Used" is clicked, the entire table is hidden.
             fullHTML += `
                 <h3>GPU Info</h3>
                 <div style="margin-bottom: 15px; line-height: 1.8;">
@@ -324,6 +383,7 @@
                 `;
             });
 
+            // Confirm GPU section
             fullHTML += `
                     </tbody>
                 </table>
@@ -372,7 +432,7 @@
                                     <input type="text" 
                                         id="${fieldId}-custom-input" 
                                         class="custom-input" 
-                                        placeholder="Or type a custom value">
+                                        placeholder="If other LLMs are used, type name here.">
                                     <button class="add-custom-btn" id="${fieldId}-add-btn">Add</button>
                                 </div>
                             </div>

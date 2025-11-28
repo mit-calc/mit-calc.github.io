@@ -31,7 +31,13 @@
             <div class="split-container">
                 <div class="left-panel">
                     <h2>Find Your Research Papers</h2>
-                    <p>Enter your name to see which papers you've contributed to:</p>
+                    <p>Enter your name to checked the information saved about a paper you've authored. 
+                    <b>Important: If you are not the first author of a paper, you are not allowed to edit information.</b>
+                    <br><br>
+                    All papers in our database are from <b>2022-2025</b>, published from the following conferences: <b>ACL, COLM, EACL, EMNLP, ICLR, ICML, NAACL, NeurIPS</b>.<br><br>
+                    If your author name or title needs to be changed, please contact us at: [email link]
+
+                    
 
                     <!-- User puts in their name and paper title here. -->
                     <form id="searchForm">
@@ -45,7 +51,10 @@
                         
                         <div style="margin-bottom: 1rem;">
                             <label for="titleInput" style="display: block; font-weight: bold; margin-bottom: 0.25rem; font-size: 0.95rem;">Paper Title:</label>
-                            <input type="text" id="titleInput" placeholder="Enter paper title" autocomplete="off">
+                            <div class="search-container" style="position: relative;">
+                                <input type="text" id="titleInput" placeholder="Enter paper title" autocomplete="off">
+                                <div id="title-suggestions" class="suggestions-dropdown"></div>
+                            </div>
                         </div>
                         
                         <button type="submit" id="submitName">Search</button>
@@ -203,6 +212,68 @@
             displaySuggestions(suggestions);
         });
 
+        // Fetch paper title suggestions based on author name
+        async function fetchTitleSuggestions(titleQuery, authorName) {
+            if (!titleQuery.trim()) {
+                return [];
+            }
+            
+            const response = await fetch('/suggest_titles', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title_query: titleQuery,
+                    author_name: authorName
+                })
+            });
+            
+            const data = await response.json();
+            return data.suggestions || [];
+        }
+
+        // Display title suggestions
+        function displayTitleSuggestions(suggestions) {
+            const suggestionsDiv = document.getElementById('title-suggestions');
+            
+            if (suggestions.length === 0) {
+                suggestionsDiv.classList.remove('show');
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = suggestions
+                .map(title => `<div class="suggestion-item" onclick="selectTitleSuggestion('${title.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">${title}</div>`)
+                .join('');
+            
+            suggestionsDiv.classList.add('show');
+        }
+
+        // Select a title suggestion
+        function selectTitleSuggestion(title) {
+            document.getElementById('titleInput').value = title;
+            document.getElementById('title-suggestions').classList.remove('show');
+        }
+
+        // Add input event listener for title suggestions
+        document.getElementById('titleInput').addEventListener('input', async function(e) {
+            const titleQuery = e.target.value;
+            const authorName = document.getElementById('nameInput').value.trim();
+            const suggestions = await fetchTitleSuggestions(titleQuery, authorName);
+            displayTitleSuggestions(suggestions);
+        });
+
+        // Update the hide suggestions code to include title suggestions
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('suggestions').classList.remove('show');
+            }
+            if (!e.target.closest('#titleInput') && !e.target.closest('#title-suggestions')) {
+                const titleSuggestions = document.getElementById('title-suggestions');
+                if (titleSuggestions) {
+                    titleSuggestions.classList.remove('show');
+                }
+            }
+        });
+
         // Hide suggestions when clicking outside
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.search-container')) {
@@ -331,6 +402,125 @@
             }
         };
 
+        // Validate funding amount to be non-negative with up to 2 decimal places
+        window.validateFundingAmount = function(input) {
+            if (input.value < 0) {
+                input.value = '0';
+                return;
+            }
+            if (input.value.includes('.')) {
+                const parts = input.value.split('.');
+                if (parts[1] && parts[1].length > 2) {
+                    input.value = parseFloat(input.value).toFixed(2);
+                }
+            }
+        };
+
+        // Add a new funding row
+        window.addFundingRow = function() {
+            const tbody = document.getElementById('funding-table-body');
+            const newRow = document.createElement('tr');
+            newRow.className = 'funding-row';
+            newRow.innerHTML = `
+                <td>
+                    <select class="funding-resource-select">
+                        <option value="">Select country...</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="funding-type-select">
+                        <option value="">Select type...</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="number" 
+                        class="funding-amount-input" 
+                        placeholder="0.00" 
+                        min="0" 
+                        step="0.01"
+                        oninput="validateFundingAmount(this)">
+                </td>
+                <td style="text-align: center;">
+                    <span class="remove-funding-row-x" onclick="removeFundingRow(this)" style="cursor: pointer; font-size: 20px; color: #666;">&times;</span>
+                </td>
+            `;
+            tbody.appendChild(newRow);
+            
+            // Populate the dropdowns in the new row
+            populateFundingDropdowns();
+            
+            updateRemoveButtons();
+        };
+
+        // Remove a funding row
+        window.removeFundingRow = function(button) {
+            const row = button.closest('tr');
+            row.remove();
+            updateRemoveButtons();
+        };
+
+        // Update visibility of remove buttons
+        function updateRemoveButtons() {
+            const rows = document.querySelectorAll('.funding-row');
+            rows.forEach((row, index) => {
+                const removeX = row.querySelector('.remove-funding-row-x');
+                if (removeX) {
+                    removeX.style.display = rows.length > 1 ? 'inline' : 'none';
+                }
+            });
+        }
+
+        // Populate funding dropdowns with options from multiselect.js
+        function populateFundingDropdowns() {
+            const fundingResourceSelects = document.querySelectorAll('.funding-resource-select');
+            fundingResourceSelects.forEach(select => {
+                // Save current selection
+                const currentValue = select.value;
+                
+                // Keep the first option (placeholder)
+                const placeholder = select.options[0];
+                select.innerHTML = '';
+                select.appendChild(placeholder);
+                
+                // Add country options
+                COUNTRIES.forEach(country => {
+                    const option = document.createElement('option');
+                    option.value = country;
+                    option.textContent = country;
+                    select.appendChild(option);
+                });
+                
+                // Restore selection
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+
+            const fundingTypeSelects = document.querySelectorAll('.funding-type-select');
+            fundingTypeSelects.forEach(select => {
+                // Save current selection
+                const currentValue = select.value;
+                
+                // Keep the first option (placeholder)
+                const placeholder = select.options[0];
+                select.innerHTML = '';
+                select.appendChild(placeholder);
+                
+                // Add funding type options
+                FUNDING_TYPES.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    select.appendChild(option);
+                });
+                
+                // Restore selection
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+        }
+
         // User clicks on paper title -> Display paper's info on right side
         async function showDetails(index){
             // Resets the section check buttons
@@ -354,6 +544,8 @@
 
             // Build all HTML first, for displaying paper's info in the right panel
             let fullHTML = `
+                <p><span style="color: #0066cc">Blue text</span> is information that we've already scraped about your paper. 
+                    If this information is incorrect, enter the correct information in the corresponding query. You do not have to fill in every query.</p>
                 <h3>Basic Info</h3>
                 <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
                 <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
@@ -394,16 +586,51 @@
                 "Others"
             ];
 
-            // GPU Table - User inputs Type, Number, Storage, Inference Time
-            // TODO: Add something where if "No GPUs Used" is clicked, the entire table is hidden.
+            // GPU Info Section - Display as bullets
+            fullHTML += `<h3>GPU Info</h3>`;
+
+            const gpuNumber = data["GPU Number"];
+            const gpuType = data["GPU Type"];
+            const gpuStorage = data["GPU Storage"];
+            const inferenceTime = data["Inference Time"];
+
+            // Check if all GPU info is N/A
+            const allGpuNA = (gpuNumber === "N/A" || !gpuNumber) && 
+                            (gpuType === "N/A" || !gpuType) && 
+                            (gpuStorage === "N/A" || !gpuStorage) && 
+                            (inferenceTime === "N/A" || !inferenceTime);
+
+            if (allGpuNA) {
+                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No GPU info found</div>`;
+            } else if (Array.isArray(gpuNumber) && Array.isArray(gpuType) && gpuNumber.length === gpuType.length) {
+                // We have aligned list data from corrections
+                fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
+                for (let i = 0; i < gpuType.length; i++) {
+                    const num = (gpuNumber[i] && gpuNumber[i] !== "N/A") ? gpuNumber[i] : "(N/A)";
+                    const type = (gpuType[i] && gpuType[i] !== "N/A") ? gpuType[i] : "(N/A)";
+                    const storage = Array.isArray(gpuStorage) && gpuStorage[i] && gpuStorage[i] !== "N/A" ? gpuStorage[i] : "(N/A)";
+                    const time = Array.isArray(inferenceTime) && inferenceTime[i] && inferenceTime[i] !== "N/A" ? inferenceTime[i] : "(N/A)";
+                    fullHTML += `<li>${num}x ${type}, ${storage} GB, ${time} s inference time</li>`;
+                }
+                fullHTML += `</ul>`;
+            } else {
+                // We have mismatched or single values - display separately
+                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
+                
+                const displayGpuType = (gpuType && gpuType !== "N/A") ? gpuType : "(N/A)";
+                const displayGpuNumber = (gpuNumber && gpuNumber !== "N/A") ? gpuNumber : "(N/A)";
+                const displayGpuStorage = (gpuStorage && gpuStorage !== "N/A") ? gpuStorage : "(N/A)";
+                const displayInferenceTime = (inferenceTime && inferenceTime !== "N/A") ? inferenceTime : "(N/A)";
+                
+                fullHTML += `<div><b>GPU Type:</b> ${displayGpuType}</div>`;
+                fullHTML += `<div><b>GPU Number:</b> ${displayGpuNumber}</div>`;
+                fullHTML += `<div><b>GPU Storage:</b> ${displayGpuStorage} GB</div>`;
+                fullHTML += `<div><b>Inference Time:</b> ${displayInferenceTime} s</div>`;
+                fullHTML += `</div>`;
+            }
+
+            // GPU Table for user input
             fullHTML += `
-                <h3>GPU Info</h3>
-                <div style="margin-bottom: 15px; line-height: 1.8;">
-                    <div><b>GPU Type:</b> ${data["GPU Type"] || "N/A"}</div>
-                    <div><b>GPU Number:</b> ${data["GPU Number"] || "N/A"}</div>
-                    <div><b>GPU Storage:</b> ${data["GPU Storage"] || "N/A"}</div>
-                    <div><b>Inference Time:</b> ${data["Inference Time"] || "N/A"}</div>
-                </div>
                 <button id="no-gpus-btn" class="no-gpus-button" onclick="toggleNoGPUs()">No GPUs Used</button>
                 <table class="gpu-info-table">
                     <thead>
@@ -427,7 +654,6 @@
                 `;
             });
 
-            // Confirm GPU section
             fullHTML += `
                     </tbody>
                 </table>
@@ -442,12 +668,20 @@
                     fields: ["LLM(s) FineTuning", "LLM(s) Evaluation"]
                 },
                 {
-                    heading: "Funding Info",
-                    fields: ["API Cost (USD $)", "Funding Resource", "Funding Type"]
+                    heading: "API Cost",
+                    fields: ["API Cost (USD $)"]
                 }
             ];
 
             function createFieldHTML(label, value) {
+                // Skip funding fields - they're handled by the table
+                if (label === "Funding Resource" || label === "Funding Type") {
+                    return '';
+                }
+                
+                // Format value - add parentheses if N/A
+                const displayValue = value === "N/A" ? "(N/A)" : value;
+                
                 // Check if this field should be a multi-select
                 if (MULTI_SELECT_CONFIG[label]) {
                     const config = MULTI_SELECT_CONFIG[label];
@@ -464,7 +698,7 @@
                     return `
                         <div class="field">
                             <span class="label"><b>${label}:</b></span>
-                            <span class="value">${value}</span>
+                            <span class="value" style="color: #0066cc;">${displayValue}</span>
                             <div class="multi-select-container">
                                 ${placeholderHTML}
                                 <div class="selected-tags" id="${fieldId}-tags"></div>
@@ -488,7 +722,7 @@
                     return `
                         <div class="field">
                             <span class="label"><b>${label}:</b></span>
-                            <span class="value">${value}</span>
+                            <span class="value" style="color: #0066cc;">${displayValue}</span>
                             <br>
                             <input type="number" 
                                 class="correction api-cost-input" 
@@ -504,7 +738,7 @@
                 return `
                     <div class="field">
                         <span class="label"><b>${label}:</b></span>
-                        <span class="value">${value}</span>
+                        <span class="value" style="color: #0066cc;">${displayValue}</span>
                         <br>
                         <input type="text" class="correction" placeholder="Correct this value if wrong">
                     </div>
@@ -527,7 +761,7 @@
                     `;
                 }
                 
-                if (section.heading === "Funding Info") {
+                if (section.heading === "API Cost") {
                     fullHTML += `
                         <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
                             I checked that all information displayed in this section is correct
@@ -535,6 +769,102 @@
                     `;
                 }
             });
+
+            // Funding Info Section - Display as bullets
+            fullHTML += `<h3>Funding Info</h3>`;
+
+            const fundingResource = data["Funding Resource"];
+            const fundingType = data["Funding Type"];
+            const fundingAmount = data["Funding Amount"];
+
+            // Check if all funding info is N/A
+            const allFundingNA = (fundingResource === "N/A" || !fundingResource) && 
+                                (fundingType === "N/A" || !fundingType) && 
+                                (fundingAmount === "N/A" || !fundingAmount);
+
+            if (allFundingNA) {
+                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No funding info found</div>`;
+            } else if (fundingResource && fundingResource !== "N/A" && fundingType && fundingType !== "N/A" && 
+                    fundingResource.includes(',') && fundingType.includes(',')) {
+                // We have comma-separated list data - try to align them
+                const resources = fundingResource.split(',').map(s => s.trim());
+                const types = fundingType.split(',').map(s => s.trim());
+                const amounts = fundingAmount && fundingAmount !== "N/A" ? fundingAmount.split(',').map(s => s.trim()) : [];
+                
+                if (resources.length === types.length) {
+                    // Lists are aligned, show as bullets
+                    fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
+                    for (let i = 0; i < resources.length; i++) {
+                        const resource = resources[i] !== "N/A" ? resources[i] : "(N/A)";
+                        const type = types[i] !== "N/A" ? types[i] : "(N/A)";
+                        const amount = amounts[i] && amounts[i] !== "N/A" ? amounts[i] : "(N/A)";
+                        fullHTML += `<li>${type} funding from ${resource}: $${amount}</li>`;
+                    }
+                    fullHTML += `</ul>`;
+                } else {
+                    // Lists are mismatched - show separately
+                    fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
+                    fullHTML += `<div><b>Funding Resource:</b> ${fundingResource}</div>`;
+                    fullHTML += `<div><b>Funding Type:</b> ${fundingType}</div>`;
+                    fullHTML += `<div><b>Funding Amount:</b> $${fundingAmount}</div>`;
+                    fullHTML += `</div>`;
+                }
+            } else {
+                // Single values or partial data - display separately
+                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
+                
+                const displayResource = (fundingResource && fundingResource !== "N/A") ? fundingResource : "(N/A)";
+                const displayType = (fundingType && fundingType !== "N/A") ? fundingType : "(N/A)";
+                const displayAmount = (fundingAmount && fundingAmount !== "N/A") ? fundingAmount : "(N/A)";
+                
+                fullHTML += `<div><b>Funding Resource:</b> ${displayResource}</div>`;
+                fullHTML += `<div><b>Funding Type:</b> ${displayType}</div>`;
+                fullHTML += `<div><b>Funding Amount:</b> $${displayAmount}</div>`;
+                fullHTML += `</div>`;
+            }
+
+            // Funding Table for user input
+            fullHTML += `
+                <table class="gpu-info-table" id="funding-table">
+                    <thead>
+                        <tr>
+                            <th>Funding Resource</th>
+                            <th>Funding Type</th>
+                            <th>Funding Amount (USD $)</th>
+                            <th style="width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="funding-table-body">
+                        <tr class="funding-row">
+                            <td>
+                                <select class="funding-resource-select">
+                                    <option value="">Select country...</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select class="funding-type-select">
+                                    <option value="">Select type...</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" 
+                                    class="funding-amount-input" 
+                                    placeholder="0.00" 
+                                    min="0" 
+                                    step="0.01"
+                                    oninput="validateFundingAmount(this)">
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="remove-funding-row-x" onclick="removeFundingRow(this)" style="display:none; cursor: pointer; font-size: 20px; color: #666;">&times;</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button id="add-funding-row-btn" class="no-gpus-button" onclick="addFundingRow()">Add Another Funding Source</button>
+                <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
+                    I checked that all information displayed in this section is correct
+                </button>
+            `;
 
             // Additional Comments box
             fullHTML += `
@@ -551,6 +881,9 @@
 
             // Set all HTML at once
             detailsDiv.innerHTML = fullHTML;
+
+            // Populate funding dropdowns from multiselect.js arrays
+            populateFundingDropdowns();
 
             // Now initialize multi-select fields
             Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
@@ -660,10 +993,42 @@
                     if (data["Inference Time"]) corrections[`Inference Time ${index + 1}`] = data["Inference Time"];
                 });
             }
+          
+            // Handle funding table
+            const fundingResources = [];
+            const fundingTypes = [];
+            const fundingAmounts = [];
 
-            // Handle multi-select fields (alphabetically sorted)
+            document.querySelectorAll('.funding-row').forEach(row => {
+                const resourceSelect = row.querySelector('.funding-resource-select');
+                const typeSelect = row.querySelector('.funding-type-select');
+                const amountInput = row.querySelector('.funding-amount-input');
+                
+                const resource = resourceSelect ? resourceSelect.value : '';
+                const type = typeSelect ? typeSelect.value : '';
+                const amount = amountInput ? amountInput.value : '';
+                
+                console.log('Row data:', {resource, type, amount}); // Debug line
+                
+                if (resource || type || amount) {
+                    fundingResources.push(resource || 'N/A');
+                    fundingTypes.push(type || 'N/A');
+                    fundingAmounts.push(amount ? parseFloat(amount).toFixed(2) : 'N/A');
+                }
+            });
+
+            console.log('Final arrays:', {fundingResources, fundingTypes, fundingAmounts}); // Debug line
+
+            corrections["Funding Resource"] = fundingResources.length > 0 ? fundingResources.join(', ') : "N/A";
+            corrections["Funding Type"] = fundingTypes.length > 0 ? fundingTypes.join(', ') : "N/A";
+            corrections["Funding Amount"] = fundingAmounts.length > 0 ? fundingAmounts.join(', ') : "N/A";
+
+            // Handle multi-select fields for LLMs only (alphabetically sorted)
             Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
-                corrections[fieldLabel] = window.getMultiSelectValues(fieldLabel);
+                // Skip funding fields - they're handled by the table
+                if (fieldLabel !== "Funding Resource" && fieldLabel !== "Funding Type") {
+                    corrections[fieldLabel] = window.getMultiSelectValues(fieldLabel);
+                }
             });
 
             // Handle other regular text fields (but skip multi-select fields)
@@ -681,6 +1046,8 @@
 
             corrections["Share any additional comments below:"] =
                 document.getElementById('additional-comments').value.trim() || "N/A";
+            
+            console.log("Full corrections object being sent:", corrections);
 
             const response = await fetch('/submit_corrections', {
                 method: 'POST',
@@ -695,7 +1062,7 @@
 
             const data = await response.json();
             console.log("Server response:", data);
-            alert("Corrections submitted!");
+            alert("Corrections submitted! Refresh the page to see your changes.");
         }
 
     </script>

@@ -75,6 +75,7 @@ def paper_tracker(df, df_corrections):
           "API Cost": row["API Cost (i.e. model testing, and iterative retraining)"] if pd.notna(row["API Cost (i.e. model testing, and iterative retraining)"]) else "N/A",
           "Funding Resource": row["Funding Resource"] if pd.notna(row["Funding Resource"]) else "N/A",
           "Funding Type": row["Funding Type"] if pd.notna(row["Funding Type"]) else "N/A",
+          "Funding Amount": "N/A",
           "GPU Info Checked": "Not Checked",
           "LLM Info Checked": "Not Checked",
           "Funding Info Checked": "Not Checked",
@@ -89,26 +90,32 @@ def paper_tracker(df, df_corrections):
       if row["id"] in df_corrections["id"].values:
         matches = df_corrections[df_corrections["id"] == row["id"]]
 
-        paper_info["Last update made by"] = matches["User Name"].iloc[-1]
-        paper_info["Timestamp"] = matches["Timestamp"].iloc[-1]
-        paper_info["Additional Comments"] = matches["Additional Comments"].iloc[-1]
+        # Get only the latest entries (rows with the most recent timestamp)
+        latest_timestamp = matches["Timestamp"].max()
+        latest_matches = matches[matches["Timestamp"] == latest_timestamp]
 
-        paper_info["GPU Number"] = matches["GPU Number"].tolist()
-        paper_info["GPU Type"] = matches["GPU Type"].tolist()
-        paper_info["GPU Storage"] = matches["GPU Storage"].tolist()
-        paper_info["Inference Time"] = matches["Inference Time"].tolist()  # "Time" is capitalized in the corrections log!
+        paper_info["Last update made by"] = latest_matches["User Name"].iloc[-1]
+        paper_info["Timestamp"] = latest_matches["Timestamp"].iloc[-1]
+        paper_info["Additional Comments"] = latest_matches["Additional Comments"].iloc[-1]
 
-        paper_info["LLM(s) FineTuning"] = matches["LLM(s) FineTuning"].iloc[-1]
-        paper_info["LLM(s) Evaluation"] = matches["LLM(s) Evaluation"].iloc[-1]
-        paper_info["API Cost"] = matches["API Cost"].iloc[-1]
-        paper_info["Funding Resource"] = matches["Funding Resource"].iloc[-1]
-        paper_info["Funding Type"] = matches["Funding Type"].iloc[-1]
+        paper_info["GPU Number"] = latest_matches["GPU Number"].tolist()
+        paper_info["GPU Type"] = latest_matches["GPU Type"].tolist()
+        paper_info["GPU Storage"] = latest_matches["GPU Storage"].tolist()
+        paper_info["Inference Time"] = latest_matches["Inference Time"].tolist()
 
-        if matches["GPU CHECKED"].iloc[-1] == "Checked":
+        paper_info["LLM(s) FineTuning"] = latest_matches["LLM(s) FineTuning"].iloc[-1]
+        paper_info["LLM(s) Evaluation"] = latest_matches["LLM(s) Evaluation"].iloc[-1]
+        
+        paper_info["API Cost"] = latest_matches["API Cost"].iloc[-1]
+        paper_info["Funding Resource"] = latest_matches["Funding Resource"].iloc[-1]
+        paper_info["Funding Type"] = latest_matches["Funding Type"].iloc[-1]
+        paper_info["Funding Amount"] = latest_matches["Funding Amount"].iloc[-1]
+
+        if latest_matches["GPU CHECKED"].iloc[-1] == "Checked":
           paper_info["GPU Info Checked"] = "Checked"
-        if matches["LLM CHECKED"].iloc[-1] == "Checked":
+        if latest_matches["LLM CHECKED"].iloc[-1] == "Checked":
           paper_info["LLM Info Checked"] = "Checked"
-        if matches["Funding CHECKED"].iloc[-1] == "Checked":
+        if latest_matches["Funding CHECKED"].iloc[-1] == "Checked":
           paper_info["Funding Info Checked"] = "Checked"
 
       paper_dict[row["id"]] = paper_info

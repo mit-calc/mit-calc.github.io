@@ -18,7 +18,7 @@ SCOPES = [
 creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
 creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
-# # * FOR RUNNING LOCALLY *
+# * FOR RUNNING LOCALLY *
 # creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
 
 client = gspread.authorize(creds)
@@ -109,6 +109,41 @@ def suggest_names():
     return jsonify({'suggestions': matching_names})
 
 
+@app.route('/suggest_titles', methods=['POST'])
+def suggest_titles():
+    data = request.get_json()
+    title_query = data.get('title_query', '').strip().lower()
+    author_name = data.get('author_name', '').strip()
+    
+    if not title_query:
+        return jsonify({'suggestions': []})
+    
+    # If author name is provided, filter by that author's papers first
+    if author_name:
+        key = biblios_lower.get(author_name.lower())
+        if key and key in biblios:
+            # Get papers for this author
+            papers_list = biblios[key]
+            matching_titles = [
+                title for idx, title, paper_id in papers_list
+                if title_query in title.lower()
+            ]
+            # Limit to top 10 suggestions, sorted alphabetically
+            matching_titles = sorted(set(matching_titles))[:10]
+            return jsonify({'suggestions': matching_titles})
+    
+    # If no author name or author not found, search all papers
+    matching_titles = [
+        row['title'] for _, row in df.iterrows()
+        if pd.notna(row.get('title')) and title_query in str(row['title']).lower()
+    ]
+    
+    # Limit to top 10 suggestions, sorted alphabetically
+    matching_titles = sorted(set(matching_titles))[:10]
+    
+    return jsonify({'suggestions': matching_titles})
+
+
 # Return a list of the user's papers when they search their name.
 @app.route('/query', methods=['POST'])
 def query():
@@ -143,37 +178,69 @@ def paper_details():
         return jsonify({'error': 'Invalid paper index'}), 404
 
     row = df.iloc[idx]
+    paper_id = row.get('id')
+    
+    # Get consolidated data from paper_updates
+    paper_updates_fresh = get_fresh_data()
+    
+    if paper_id in paper_updates_fresh:
+        paper_data = paper_updates_fresh[paper_id]
+        
+        # Helper function to clean values
+        def clean_value(val):
+            if pd.isna(val) or val is None or val == "":
+                return "N/A"
+            return str(val)
+        
+        # Return the consolidated data
+        paper_info = {
+            "Title": clean_value(paper_data.get("Title")),
+            "Authors": clean_value(paper_data.get("Authors")),
+            "Year": clean_value(row.get("year")),
+            "GPU Number": paper_data.get("GPU Number", "N/A"),
+            "GPU Type": paper_data.get("GPU Type", "N/A"),
+            "GPU Storage": paper_data.get("GPU Storage", "N/A"),
+            "Inference Time": paper_data.get("Inference Time", "N/A"),
+            "LLM(s) FineTuning": clean_value(paper_data.get("LLM(s) FineTuning")),
+            "LLM(s) Evaluation": clean_value(paper_data.get("LLM(s) Evaluation")),
+            "API Cost (USD $)": clean_value(paper_data.get("API Cost")),
+            "Funding Resource": clean_value(paper_data.get("Funding Resource")),
+            "Funding Type": clean_value(paper_data.get("Funding Type")),
+            "Funding Amount": clean_value(paper_data.get("Funding Amount"))
+        }
+    else:
+        # Fallback to original df data if not in paper_updates
+        fields = [
+            "title", "authors", "year", "GPU Number", "GPU Type", "GPU Storage",
+            "Inference time", "LLM(s) FineTuning", "LLM(s) Evaluation",
+            "API Cost (i.e. model testing, and iterative retraining)",
+            "Funding Resource", "Funding Type"
+        ]
 
-    fields = [
-        "title", "authors", "year", "GPU Number", "GPU Type", "GPU Storage",
-        "Inference time", "LLM(s) FineTuning", "LLM(s) Evaluation",
-        "API Cost (i.e. model testing, and iterative retraining)",
-        "Funding Resource", "Funding Type"
-    ]
+        paper_info_raw = {}
+        for f in fields:
+            v = row.get(f)
+            if pd.isna(v) or v is None or v == " ":
+                paper_info_raw[f] = "N/A"
+            else:
+                paper_info_raw[f] = str(v)
 
-    paper_info = {}
-    for f in fields:
-        v = row.get(f)
-        if pd.isna(v) or v is None or v == " ":
-            paper_info[f] = "N/A"
-        else:
-            paper_info[f] = str(v)
-
-    # Info about the paper that gets pulled from the spreadsheet onto the website.
-    paper_info = {
-        "Title": paper_info.get("title"),
-        "Authors": paper_info.get("authors"),
-        "Year": paper_info.get("year"),
-        "GPU Number": paper_info.get("GPU Number"),
-        "GPU Type": paper_info.get("GPU Type"),
-        "GPU Storage": paper_info.get("GPU Storage"),
-        "Inference Time": paper_info.get("Inference time"),
-        "LLM(s) FineTuning": paper_info.get("LLM(s) FineTuning"),
-        "LLM(s) Evaluation": paper_info.get("LLM(s) Evaluation"),
-        "API Cost (USD $)": paper_info.get("API Cost (i.e. model testing, and iterative retraining)"),
-        "Funding Resource": paper_info.get("Funding Resource"),
-        "Funding Type": paper_info.get("Funding Type")
-    }
+        paper_info = {
+            "Title": paper_info_raw.get("title"),
+            "Authors": paper_info_raw.get("authors"),
+            "Year": paper_info_raw.get("year"),
+            "GPU Number": paper_info_raw.get("GPU Number"),
+            "GPU Type": paper_info_raw.get("GPU Type"),
+            "GPU Storage": paper_info_raw.get("GPU Storage"),
+            "Inference Time": paper_info_raw.get("Inference time"),
+            "LLM(s) FineTuning": paper_info_raw.get("LLM(s) FineTuning"),
+            "LLM(s) Evaluation": paper_info_raw.get("LLM(s) Evaluation"),
+            "API Cost (USD $)": paper_info_raw.get("API Cost (i.e. model testing, and iterative retraining)"),
+            "Funding Resource": paper_info_raw.get("Funding Resource"),
+            "Funding Type": paper_info_raw.get("Funding Type"),
+            "Funding Amount": "N/A"
+        }
+    
     return jsonify(paper_info)
 
 
@@ -404,6 +471,7 @@ def submit_corrections():
             corrections.get("API Cost (USD $)", "N/A"),
             corrections.get("Funding Resource", "N/A"),
             corrections.get("Funding Type", "N/A"),
+            corrections.get("Funding Amount", "N/A"),
             corrections.get("Funding CHECKED", "N/A"),
             corrections.get("Share any additional comments below:", "N/A"),
             timestamp

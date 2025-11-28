@@ -523,6 +523,8 @@
 
         // User clicks on paper title -> Display paper's info on right side
         async function showDetails(index){
+            console.log("showDetails called with index:", index);
+            
             // Resets the section check buttons
             gpuChecked = false;
             llmChecked = false;
@@ -531,414 +533,437 @@
             currentPaperIndex = index;
             currentPaperId = paperIdMap[index];
 
+            console.log("Paper ID:", currentPaperId);
+
             const detailsDiv = document.getElementById('paper-details');
             detailsDiv.innerHTML = "<p>Loading...</p>";
 
-            const response = await fetch('/paper_details', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({index})
-            });
+            try {
+                const response = await fetch('/paper_details', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index})
+                });
 
-            const data = await response.json();
+                console.log("Response status:", response.status);
 
-            // Build all HTML first, for displaying paper's info in the right panel
-            let fullHTML = `
-                <p><span style="color: #0066cc">Blue text</span> is information that we've already scraped about your paper. 
+                const data = await response.json();
+                console.log("Data received:", data);
+
+                // Build all HTML first, for displaying paper's info in the right panel
+                let fullHTML = `
+                    <p><span style="color: #0066cc">Blue text</span> is information that we've already scraped about your paper. 
                     If this information is incorrect, enter the correct information in the corresponding query. You do not have to fill in every query.</p>
-                <h3>Basic Info</h3>
-                <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
-                <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
-                <div class="field"><h4>Year</h4><p class="value">${data["Year"] || "N/A"}</p></div>
-                
-                <h3>Eligibility Criteria</h3>
-                <div class="eligibility-box">
-                    <p><b>READ BEFORE SUBMITTING!</b> Please confirm your paper meets ALL of the following criteria:</p>
-                    <ul>
-                        <li>You are the first author or co-first author of this paper.</li>
-                        <li>The project is completed.</li>
-                        <li>The project works with Large Language Models (LLM) ONLY.</li>
-                        <li>This work is primarily in the CS domain.</li>
-                        <li>This work is NOT a survey paper.</li>
-                        <li>You made sure that the information you entered is accurate. We will check the quality of your answers before sending any compensation.</li>
-                    </ul>
-                    <p><b>You can only submit revised information for a maximum of five papers. All inputs are optional, 
-                        so only submit information that you know is correct.</b></p>
-                    <label class="eligibility-confirm">
-                        <input type="checkbox" id="eligibility-checkbox">
-                        <span>I confirm this paper meets all eligibility criteria above</span>
-                    </label>
-                </div>
-            `;
-
-            const gpuTypes = [
-                "NVIDIA Tesla V100",
-                "NVIDIA Tesla A100",
-                "NVIDIA Tesla P100",
-                "NVIDIA Tesla A40",
-                "NVIDIA Tesla A800",
-                "NVIDIA Tesla A4000",
-                "NVIDIA Tesla A5000",
-                "NVIDIA Tesla H100",
-                "NVIDIA Tesla A6000",
-                "Nvidia GeForce RTX 3090",
-                "Nvidia GeForce RTX 4090",
-                "Others"
-            ];
-
-            // GPU Info Section - Display as bullets
-            fullHTML += `<h3>GPU Info</h3>`;
-
-            const gpuNumber = data["GPU Number"];
-            const gpuType = data["GPU Type"];
-            const gpuStorage = data["GPU Storage"];
-            const inferenceTime = data["Inference Time"];
-
-            // Check if all GPU info is N/A
-            const allGpuNA = (gpuNumber === "N/A" || !gpuNumber) && 
-                            (gpuType === "N/A" || !gpuType) && 
-                            (gpuStorage === "N/A" || !gpuStorage) && 
-                            (inferenceTime === "N/A" || !inferenceTime);
-
-            if (allGpuNA) {
-                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No GPU info found</div>`;
-            } else if (Array.isArray(gpuNumber) && Array.isArray(gpuType) && gpuNumber.length === gpuType.length) {
-                // We have aligned list data from corrections
-                fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
-                for (let i = 0; i < gpuType.length; i++) {
-                    const num = (gpuNumber[i] && gpuNumber[i] !== "N/A") ? gpuNumber[i] : "(N/A)";
-                    const type = (gpuType[i] && gpuType[i] !== "N/A") ? gpuType[i] : "(N/A)";
-                    const storage = Array.isArray(gpuStorage) && gpuStorage[i] && gpuStorage[i] !== "N/A" ? gpuStorage[i] : "(N/A)";
-                    const time = Array.isArray(inferenceTime) && inferenceTime[i] && inferenceTime[i] !== "N/A" ? inferenceTime[i] : "(N/A)";
-                    fullHTML += `<li>${num}x ${type}, ${storage} GB, ${time} s inference time</li>`;
-                }
-                fullHTML += `</ul>`;
-            } else {
-                // We have mismatched or single values - display separately
-                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
-                
-                const displayGpuType = (gpuType && gpuType !== "N/A") ? gpuType : "(N/A)";
-                const displayGpuNumber = (gpuNumber && gpuNumber !== "N/A") ? gpuNumber : "(N/A)";
-                const displayGpuStorage = (gpuStorage && gpuStorage !== "N/A") ? gpuStorage : "(N/A)";
-                const displayInferenceTime = (inferenceTime && inferenceTime !== "N/A") ? inferenceTime : "(N/A)";
-                
-                fullHTML += `<div><b>GPU Type:</b> ${displayGpuType}</div>`;
-                fullHTML += `<div><b>GPU Number:</b> ${displayGpuNumber}</div>`;
-                fullHTML += `<div><b>GPU Storage:</b> ${displayGpuStorage} GB</div>`;
-                fullHTML += `<div><b>Inference Time:</b> ${displayInferenceTime} s</div>`;
-                fullHTML += `</div>`;
-            }
-
-            // GPU Table for user input
-            fullHTML += `
-                <button id="no-gpus-btn" class="no-gpus-button" onclick="toggleNoGPUs()">No GPUs Used</button>
-                <table class="gpu-info-table">
-                    <thead>
-                        <tr>
-                            <th>GPU Type</th>
-                            <th>GPU Number</th>
-                            <th>GPU Storage (GB)</th>
-                            <th>Inference Time (seconds)</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-
-            gpuTypes.forEach(gpuType => {
-                fullHTML += `
-                    <tr>
-                        <td>${gpuType}</td>
-                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Number" placeholder=""></td>
-                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Storage" placeholder=""></td>
-                        <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="Inference Time" placeholder=""></td>
-                    </tr>
-                `;
-            });
-
-            fullHTML += `
-                    </tbody>
-                </table>
-                <button id="confirm-gpu-btn" class="confirm-section-btn" onclick="confirmGPUSection()">
-                    I checked that all information displayed in this section is correct.
-                </button>
-            `;
-
-            const sections = [
-                {
-                    heading: "LLM Info",
-                    fields: ["LLM(s) FineTuning", "LLM(s) Evaluation"]
-                },
-                {
-                    heading: "API Cost",
-                    fields: ["API Cost (USD $)"]
-                }
-            ];
-
-            function createFieldHTML(label, value) {
-                // Skip funding fields - they're handled by the table
-                if (label === "Funding Resource" || label === "Funding Type") {
-                    return '';
-                }
-                
-                // Format value - add parentheses if N/A
-                const displayValue = value === "N/A" ? "(N/A)" : value;
-                
-                // Check if this field should be a multi-select
-                if (MULTI_SELECT_CONFIG[label]) {
-                    const config = MULTI_SELECT_CONFIG[label];
-                    const fieldId = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                    <h3>Basic Info</h3>
+                    <div class="field"><h4>Title</h4><p class="value">${data["Title"] || "N/A"}</p></div>
+                    <div class="field"><h4>Authors</h4><p class="value">${data["Authors"] || "N/A"}</p></div>
+                    <div class="field"><h4>Year</h4><p class="value">${data["Year"] || "N/A"}</p></div>
                     
-                    const options = config.options.map(option => 
-                        `<option value="${option}">${option}</option>`
-                    ).join('');
+                    <h3>Eligibility Criteria</h3>
+                    <div class="eligibility-box">
+                        <p><b>READ BEFORE SUBMITTING!</b> Please confirm your paper meets ALL of the following criteria:</p>
+                        <ul>
+                            <li>You are the first author or co-first author of this paper.</li>
+                            <li>The project is completed.</li>
+                            <li>The project works with Large Language Models (LLM) ONLY.</li>
+                            <li>This work is primarily in the CS domain.</li>
+                            <li>This work is NOT a survey paper.</li>
+                            <li>You made sure that the information you entered is accurate. We will check the quality of your answers before sending any compensation.</li>
+                        </ul>
+                        <p><b>You can only submit revised information for a maximum of five papers. All inputs are optional, 
+                            so only submit information that you know is correct.</b></p>
+                        <label class="eligibility-confirm">
+                            <input type="checkbox" id="eligibility-checkbox">
+                            <span>I confirm this paper meets all eligibility criteria above</span>
+                        </label>
+                    </div>
+                `;
 
-                    // Check if there's existing data
-                    const hasData = value && value !== "N/A";
-                    const placeholderHTML = hasData ? '' : '<span class="no-info-placeholder" id="' + fieldId + '-placeholder">Select choices from drop-down menu.</span>';
-                                
-                    return `
-                        <div class="field">
-                            <span class="label"><b>${label}:</b></span>
-                            <span class="value" style="color: #0066cc;">${displayValue}</span>
-                            <div class="multi-select-container">
-                                ${placeholderHTML}
-                                <div class="selected-tags" id="${fieldId}-tags"></div>
-                                <select class="multi-select-dropdown" id="${fieldId}-dropdown">
-                                    <option value="">${config.placeholder}</option>
-                                    ${options}
-                                </select>
-                                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                    <input type="text" 
-                                        id="${fieldId}-custom-input" 
-                                        class="custom-input" 
-                                        placeholder="If other LLMs are used, type name here.">
-                                    <button class="add-custom-btn" id="${fieldId}-add-btn">Add</button>
+                const gpuTypes = [
+                    "NVIDIA Tesla V100",
+                    "NVIDIA Tesla A100",
+                    "NVIDIA Tesla P100",
+                    "NVIDIA Tesla A40",
+                    "NVIDIA Tesla A800",
+                    "NVIDIA Tesla A4000",
+                    "NVIDIA Tesla A5000",
+                    "NVIDIA Tesla H100",
+                    "NVIDIA Tesla A6000",
+                    "Nvidia GeForce RTX 3090",
+                    "Nvidia GeForce RTX 4090",
+                    "Others"
+                ];
+
+                // GPU Info Section - Display as bullets
+                fullHTML += `<h3>GPU Info</h3>`;
+
+                const gpuNumber = data["GPU Number"];
+                const gpuType = data["GPU Type"];
+                const gpuStorage = data["GPU Storage"];
+                const inferenceTime = data["Inference Time"];
+
+                // Check if all GPU info is N/A
+                const allGpuNA = (gpuNumber === "N/A" || !gpuNumber) && 
+                                (gpuType === "N/A" || !gpuType) && 
+                                (gpuStorage === "N/A" || !gpuStorage) && 
+                                (inferenceTime === "N/A" || !inferenceTime);
+
+                if (allGpuNA) {
+                    fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No GPU info found</div>`;
+                } else if (Array.isArray(gpuNumber) && Array.isArray(gpuType) && gpuNumber.length === gpuType.length) {
+                    // We have aligned list data from corrections
+                    fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
+                    for (let i = 0; i < gpuType.length; i++) {
+                        const num = (gpuNumber[i] && gpuNumber[i] !== "N/A") ? gpuNumber[i] : "(N/A)";
+                        const type = (gpuType[i] && gpuType[i] !== "N/A") ? gpuType[i] : "(N/A)";
+                        const storage = Array.isArray(gpuStorage) && gpuStorage[i] && gpuStorage[i] !== "N/A" ? gpuStorage[i] : "(N/A)";
+                        const time = Array.isArray(inferenceTime) && inferenceTime[i] && inferenceTime[i] !== "N/A" ? inferenceTime[i] : "(N/A)";
+                        fullHTML += `<li>${num}x ${type}, ${storage} GB, ${time} s inference time</li>`;
+                    }
+                    fullHTML += `</ul>`;
+                } else {
+                    // We have mismatched or single values - display separately
+                    fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
+                    
+                    const displayGpuType = (gpuType && gpuType !== "N/A") ? gpuType : "(N/A)";
+                    const displayGpuNumber = (gpuNumber && gpuNumber !== "N/A") ? gpuNumber : "(N/A)";
+                    const displayGpuStorage = (gpuStorage && gpuStorage !== "N/A") ? gpuStorage : "(N/A)";
+                    const displayInferenceTime = (inferenceTime && inferenceTime !== "N/A") ? inferenceTime : "(N/A)";
+                    
+                    fullHTML += `<div><b>GPU Type:</b> ${displayGpuType}</div>`;
+                    fullHTML += `<div><b>GPU Number:</b> ${displayGpuNumber}</div>`;
+                    fullHTML += `<div><b>GPU Storage:</b> ${displayGpuStorage} GB</div>`;
+                    fullHTML += `<div><b>Inference Time:</b> ${displayInferenceTime} s</div>`;
+                    fullHTML += `</div>`;
+                }
+
+                // GPU Table for user input
+                fullHTML += `
+                    <button id="no-gpus-btn" class="no-gpus-button" onclick="toggleNoGPUs()">No GPUs Used</button>
+                    <table class="gpu-info-table">
+                        <thead>
+                            <tr>
+                                <th>GPU Type</th>
+                                <th>GPU Number</th>
+                                <th>GPU Storage (GB)</th>
+                                <th>Inference Time (seconds)</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                gpuTypes.forEach(gpuType => {
+                    fullHTML += `
+                        <tr>
+                            <td>${gpuType}</td>
+                            <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Number" placeholder=""></td>
+                            <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="GPU Storage" placeholder=""></td>
+                            <td><input type="text" class="gpu-input" data-gpu-type="${gpuType}" data-field="Inference Time" placeholder=""></td>
+                        </tr>
+                    `;
+                });
+
+                fullHTML += `
+                        </tbody>
+                    </table>
+                    <button id="confirm-gpu-btn" class="confirm-section-btn" onclick="confirmGPUSection()">
+                        I checked that all information displayed in this section is correct.
+                    </button>
+                `;
+
+                const sections = [
+                    {
+                        heading: "LLM Info",
+                        fields: ["LLM(s) FineTuning", "LLM(s) Evaluation"]
+                    }
+                ];
+
+                function createFieldHTML(label, value) {
+                    // Skip funding fields - they're handled by the table
+                    if (label === "Funding Resource" || label === "Funding Type") {
+                        return '';
+                    }
+                    
+                    // Format value - add parentheses if N/A
+                    const displayValue = value === "N/A" ? "(N/A)" : value;
+                    
+                    // Check if this field should be a multi-select
+                    if (MULTI_SELECT_CONFIG[label]) {
+                        const config = MULTI_SELECT_CONFIG[label];
+                        const fieldId = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                        
+                        const options = config.options.map(option => 
+                            `<option value="${option}">${option}</option>`
+                        ).join('');
+
+                        // Check if there's existing data
+                        const hasData = value && value !== "N/A";
+                        const placeholderHTML = hasData ? '' : '<span class="no-info-placeholder" id="' + fieldId + '-placeholder">Select choices from drop-down menu.</span>';
+                                    
+                        return `
+                            <div class="field">
+                                <span class="label"><b>${label}:</b></span>
+                                <span class="value" style="color: #0066cc;">${displayValue}</span>
+                                <div class="multi-select-container">
+                                    ${placeholderHTML}
+                                    <div class="selected-tags" id="${fieldId}-tags"></div>
+                                    <select class="multi-select-dropdown" id="${fieldId}-dropdown">
+                                        <option value="">${config.placeholder}</option>
+                                        ${options}
+                                    </select>
+                                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                        <input type="text" 
+                                            id="${fieldId}-custom-input" 
+                                            class="custom-input" 
+                                            placeholder="If other LLMs are used, type name here.">
+                                        <button class="add-custom-btn" id="${fieldId}-add-btn">Add</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                }
-                
-                if (label === "API Cost (USD $)") {
+                        `;
+                    }
+                    
+                    if (label === "API Cost (USD $)") {
+                        return `
+                            <div class="field">
+                                <span class="label"><b>${label}:</b></span>
+                                <span class="value" style="color: #0066cc;">${displayValue}</span>
+                                <br>
+                                <input type="number" 
+                                    class="correction api-cost-input" 
+                                    placeholder="Enter numerical amount" 
+                                    min="0" 
+                                    step="0.01"
+                                    oninput="validateAPICost(this)">
+                            </div>
+                        `;
+                    }
+                    
+                    // Original handling for other fields
                     return `
                         <div class="field">
                             <span class="label"><b>${label}:</b></span>
                             <span class="value" style="color: #0066cc;">${displayValue}</span>
                             <br>
-                            <input type="number" 
-                                class="correction api-cost-input" 
-                                placeholder="Enter numerical amount" 
-                                min="0" 
-                                step="0.01"
-                                oninput="validateAPICost(this)">
+                            <input type="text" class="correction" placeholder="Correct this value if wrong">
                         </div>
                     `;
                 }
-                
-                // Original handling for other fields
-                return `
-                    <div class="field">
-                        <span class="label"><b>${label}:</b></span>
-                        <span class="value" style="color: #0066cc;">${displayValue}</span>
-                        <br>
-                        <input type="text" class="correction" placeholder="Correct this value if wrong">
-                    </div>
-                `;
-            }
 
-            // Build sections HTML
-            sections.forEach(section => {
-                fullHTML += `<h3>${section.heading}</h3>`;
-                section.fields.forEach(field => {
-                    const value = data[field] || "N/A";
-                    fullHTML += createFieldHTML(field, value);
+                // Build sections HTML
+                sections.forEach(section => {
+                    fullHTML += `<h3>${section.heading}</h3>`;
+                    section.fields.forEach(field => {
+                        const value = data[field] || "N/A";
+                        fullHTML += createFieldHTML(field, value);
+                    });
+
+                    if (section.heading === "LLM Info") {
+                        fullHTML += `
+                            <button id="confirm-llm-btn" class="confirm-section-btn" onclick="confirmLLMSection()">
+                                I checked that all information displayed in this section is correct
+                            </button>
+                        `;
+                    }
                 });
 
-                if (section.heading === "LLM Info") {
-                    fullHTML += `
-                        <button id="confirm-llm-btn" class="confirm-section-btn" onclick="confirmLLMSection()">
-                            I checked that all information displayed in this section is correct
-                        </button>
-                    `;
-                }
-                
-                if (section.heading === "API Cost") {
-                    fullHTML += `
-                        <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
-                            I checked that all information displayed in this section is correct
-                        </button>
-                    `;
-                }
-            });
+                // Funding Info Section
+                fullHTML += `<h3>Funding Info</h3>`;
 
-            // Funding Info Section - Display as bullets
-            fullHTML += `<h3>Funding Info</h3>`;
+                // Display existing funding data first (in blue)
+                const fundingResource = data["Funding Resource"];
+                const fundingType = data["Funding Type"];
+                const fundingAmount = data["Funding Amount"];
+                const apiCost = data["API Cost (USD $)"] || "N/A";
+                const displayApiCost = apiCost === "N/A" ? "(N/A)" : apiCost;
 
-            const fundingResource = data["Funding Resource"];
-            const fundingType = data["Funding Type"];
-            const fundingAmount = data["Funding Amount"];
+                // Show API Cost info in blue first
+                fullHTML += `<div style="margin-bottom: 10px; color: #0066cc;"><b>API Cost:</b> ${displayApiCost}</div>`;
 
-            // Check if all funding info is N/A
-            const allFundingNA = (fundingResource === "N/A" || !fundingResource) && 
-                                (fundingType === "N/A" || !fundingType) && 
-                                (fundingAmount === "N/A" || !fundingAmount);
+                // Check if all funding info is N/A
+                const allFundingNA = (fundingResource === "N/A" || !fundingResource) && 
+                                    (fundingType === "N/A" || !fundingType) && 
+                                    (fundingAmount === "N/A" || !fundingAmount);
 
-            if (allFundingNA) {
-                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No funding info found</div>`;
-            } else if (fundingResource && fundingResource !== "N/A" && fundingType && fundingType !== "N/A" && 
-                    fundingResource.includes(',') && fundingType.includes(',')) {
-                // We have comma-separated list data - try to align them
-                const resources = fundingResource.split(',').map(s => s.trim());
-                const types = fundingType.split(',').map(s => s.trim());
-                const amounts = fundingAmount && fundingAmount !== "N/A" ? fundingAmount.split(',').map(s => s.trim()) : [];
-                
-                if (resources.length === types.length) {
-                    // Lists are aligned, show as bullets
-                    fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
-                    for (let i = 0; i < resources.length; i++) {
-                        const resource = resources[i] !== "N/A" ? resources[i] : "(N/A)";
-                        const type = types[i] !== "N/A" ? types[i] : "(N/A)";
-                        const amount = amounts[i] && amounts[i] !== "N/A" ? amounts[i] : "(N/A)";
-                        fullHTML += `<li>${type} funding from ${resource}: $${amount}</li>`;
+                if (allFundingNA) {
+                    fullHTML += `<div style="margin-bottom: 15px; color: #0066cc;">No funding info found</div>`;
+                } else if (fundingResource && fundingResource !== "N/A" && fundingType && fundingType !== "N/A" && 
+                        fundingResource.includes(',') && fundingType.includes(',')) {
+                    // We have comma-separated list data - try to align them
+                    const resources = fundingResource.split(',').map(s => s.trim());
+                    const types = fundingType.split(',').map(s => s.trim());
+                    const amounts = fundingAmount && fundingAmount !== "N/A" ? fundingAmount.split(',').map(s => s.trim()) : [];
+                    
+                    if (resources.length === types.length) {
+                        // Lists are aligned, show as bullets
+                        fullHTML += `<ul style="margin-bottom: 15px; color: #0066cc;">`;
+                        for (let i = 0; i < resources.length; i++) {
+                            const resource = resources[i] !== "N/A" ? resources[i] : "(N/A)";
+                            const type = types[i] !== "N/A" ? types[i] : "(N/A)";
+                            const amount = amounts[i] && amounts[i] !== "N/A" ? amounts[i] : "(N/A)";
+                            fullHTML += `<li>${type} funding from ${resource}: $${amount}</li>`;
+                        }
+                        fullHTML += `</ul>`;
+                    } else {
+                        // Lists are mismatched - show separately
+                        fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
+                        fullHTML += `<div><b>Funding Resource:</b> ${fundingResource}</div>`;
+                        fullHTML += `<div><b>Funding Type:</b> ${fundingType}</div>`;
+                        fullHTML += `<div><b>Funding Amount:</b> $${fundingAmount}</div>`;
+                        fullHTML += `</div>`;
                     }
-                    fullHTML += `</ul>`;
                 } else {
-                    // Lists are mismatched - show separately
+                    // Single values or partial data - display separately
                     fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
-                    fullHTML += `<div><b>Funding Resource:</b> ${fundingResource}</div>`;
-                    fullHTML += `<div><b>Funding Type:</b> ${fundingType}</div>`;
-                    fullHTML += `<div><b>Funding Amount:</b> $${fundingAmount}</div>`;
+                    
+                    const displayResource = (fundingResource && fundingResource !== "N/A") ? fundingResource : "(N/A)";
+                    const displayType = (fundingType && fundingType !== "N/A") ? fundingType : "(N/A)";
+                    const displayAmount = (fundingAmount && fundingAmount !== "N/A") ? fundingAmount : "(N/A)";
+                    
+                    fullHTML += `<div><b>Funding Resource:</b> ${displayResource}</div>`;
+                    fullHTML += `<div><b>Funding Type:</b> ${displayType}</div>`;
+                    fullHTML += `<div><b>Funding Amount:</b> $${displayAmount}</div>`;
                     fullHTML += `</div>`;
                 }
-            } else {
-                // Single values or partial data - display separately
-                fullHTML += `<div style="margin-bottom: 15px; color: #0066cc; line-height: 1.8;">`;
-                
-                const displayResource = (fundingResource && fundingResource !== "N/A") ? fundingResource : "(N/A)";
-                const displayType = (fundingType && fundingType !== "N/A") ? fundingType : "(N/A)";
-                const displayAmount = (fundingAmount && fundingAmount !== "N/A") ? fundingAmount : "(N/A)";
-                
-                fullHTML += `<div><b>Funding Resource:</b> ${displayResource}</div>`;
-                fullHTML += `<div><b>Funding Type:</b> ${displayType}</div>`;
-                fullHTML += `<div><b>Funding Amount:</b> $${displayAmount}</div>`;
-                fullHTML += `</div>`;
-            }
 
-            // Funding Table for user input
-            fullHTML += `
-                <table class="gpu-info-table" id="funding-table">
-                    <thead>
-                        <tr>
-                            <th>Funding Resource</th>
-                            <th>Funding Type</th>
-                            <th>Funding Amount (USD $)</th>
-                            <th style="width: 40px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="funding-table-body">
-                        <tr class="funding-row">
-                            <td>
-                                <select class="funding-resource-select">
-                                    <option value="">Select country...</option>
-                                </select>
-                            </td>
-                            <td>
-                                <select class="funding-type-select">
-                                    <option value="">Select type...</option>
-                                </select>
-                            </td>
-                            <td>
-                                <input type="number" 
-                                    class="funding-amount-input" 
-                                    placeholder="0.00" 
-                                    min="0" 
-                                    step="0.01"
-                                    oninput="validateFundingAmount(this)">
-                            </td>
-                            <td style="text-align: center;">
-                                <span class="remove-funding-row-x" onclick="removeFundingRow(this)" style="display:none; cursor: pointer; font-size: 20px; color: #666;">&times;</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <button id="add-funding-row-btn" class="no-gpus-button" onclick="addFundingRow()">Add Another Funding Source</button>
-                <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
-                    I checked that all information displayed in this section is correct
-                </button>
-            `;
+                // Now show the input box for API Cost
+                fullHTML += `
+                    <div class="field" style="margin-top: 15px;">
+                        <span class="label"><b>API Cost (USD $):</b></span>
+                        <input type="number" 
+                            class="correction api-cost-input" 
+                            placeholder="Enter numerical amount" 
+                            min="0" 
+                            step="0.01"
+                            oninput="validateAPICost(this)">
+                    </div>
+                `;
 
-            // Additional Comments box
-            fullHTML += `
-                <h3>Additional Comments</h3>
-                <div class="field">
-                    <textarea 
-                        id="additional-comments" 
-                        class="comment-box" 
-                        placeholder="Share any additional comments below..."
-                    ></textarea>
-                </div>
-                <button id="submitCorrections">Submit Corrections</button>
-            `;
+                // Funding Table for user input
+                fullHTML += `
+                    <table class="gpu-info-table" id="funding-table">
+                        <thead>
+                            <tr>
+                                <th>Funding Resource</th>
+                                <th>Funding Type</th>
+                                <th>Funding Amount (USD $)</th>
+                                <th style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="funding-table-body">
+                            <tr class="funding-row">
+                                <td>
+                                    <select class="funding-resource-select">
+                                        <option value="">Select country...</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="funding-type-select">
+                                        <option value="">Select type...</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" 
+                                        class="funding-amount-input" 
+                                        placeholder="0.00" 
+                                        min="0" 
+                                        step="0.01"
+                                        oninput="validateFundingAmount(this)">
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="remove-funding-row-x" onclick="removeFundingRow(this)" style="display:none; cursor: pointer; font-size: 20px; color: #666;">&times;</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button id="add-funding-row-btn" class="no-gpus-button" onclick="addFundingRow()">Add Another Funding Source</button>
+                    <button id="confirm-funding-btn" class="confirm-section-btn" onclick="confirmFundingSection()">
+                        I checked that all information displayed in this section is correct
+                    </button>
+                `;
 
-            // Set all HTML at once
-            detailsDiv.innerHTML = fullHTML;
+                // Additional Comments box
+                fullHTML += `
+                    <h3>Additional Comments</h3>
+                    <div class="field">
+                        <textarea 
+                            id="additional-comments" 
+                            class="comment-box" 
+                            placeholder="Share any additional comments below..."
+                        ></textarea>
+                    </div>
+                    <button id="submitCorrections">Submit Corrections</button>
+                `;
 
-            // Populate funding dropdowns from multiselect.js arrays
-            populateFundingDropdowns();
+                // Set all HTML at once
+                detailsDiv.innerHTML = fullHTML;
 
-            // Now initialize multi-select fields
-            Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
-                const fieldId = fieldLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-                const fieldValue = data[fieldLabel] || "";
-                const selectedItems = new Set();
-                
-                // Store reference
-                multiSelectData[fieldLabel] = selectedItems;
-                
-                // Parse existing values and add them as tags
-                if (fieldValue && fieldValue !== "N/A") {
-                    const items = fieldValue.split(',').map(item => item.trim());
-                    items.forEach(item => {
-                        if (item) {
-                            selectedItems.add(item);
-                            addMultiSelectTag(fieldId, item, fieldLabel);
-                        }
-                    });
-                }
-                
-                // Handle dropdown selection
-                const dropdown = document.getElementById(`${fieldId}-dropdown`);
-                if (dropdown) {
-                    dropdown.addEventListener('change', function() {
-                        const value = this.value;
-                        if (value && !selectedItems.has(value)) {
-                            selectedItems.add(value);
-                            addMultiSelectTag(fieldId, value, fieldLabel);
-                        }
-                        this.value = '';
-                    });
-                }
-                
-                // Handle custom input button click
-                const customInput = document.getElementById(`${fieldId}-custom-input`);
-                const addButton = document.getElementById(`${fieldId}-add-btn`);
-                if (customInput && addButton) {
-                    addButton.addEventListener('click', function() {
-                        const value = customInput.value.trim();
-                        if (value && !selectedItems.has(value)) {
-                            selectedItems.add(value);
-                            addMultiSelectTag(fieldId, value, fieldLabel);
-                        }
-                        customInput.value = '';
-                    });
-                }
-            });
+                // Populate funding dropdowns from multiselect.js arrays
+                populateFundingDropdowns();
 
-            // Add submit button event listener
-            const submitButton = document.getElementById('submitCorrections');
-            if (submitButton) {
-                submitButton.addEventListener('click', () => {
-                    submitCorrections();
+                // Now initialize multi-select fields
+                Object.keys(MULTI_SELECT_CONFIG).forEach(fieldLabel => {
+                    // Skip funding fields - they're handled by the table
+                    if (fieldLabel === "Funding Resource" || fieldLabel === "Funding Type") {
+                        return;
+                    }
+                    
+                    const fieldId = fieldLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                    const fieldValue = data[fieldLabel] || "";
+                    const selectedItems = new Set();
+                    
+                    // Store reference
+                    multiSelectData[fieldLabel] = selectedItems;
+                    
+                    // Parse existing values and add them as tags
+                    if (fieldValue && fieldValue !== "N/A") {
+                        const items = fieldValue.split(',').map(item => item.trim());
+                        items.forEach(item => {
+                            if (item) {
+                                selectedItems.add(item);
+                                addMultiSelectTag(fieldId, item, fieldLabel);
+                            }
+                        });
+                    }
+                    
+                    // Handle dropdown selection
+                    const dropdown = document.getElementById(`${fieldId}-dropdown`);
+                    if (dropdown) {
+                        dropdown.addEventListener('change', function() {
+                            const value = this.value;
+                            if (value && !selectedItems.has(value)) {
+                                selectedItems.add(value);
+                                addMultiSelectTag(fieldId, value, fieldLabel);
+                            }
+                            this.value = '';
+                        });
+                    }
+                    
+                    // Handle custom input button click
+                    const customInput = document.getElementById(`${fieldId}-custom-input`);
+                    const addButton = document.getElementById(`${fieldId}-add-btn`);
+                    if (customInput && addButton) {
+                        addButton.addEventListener('click', function() {
+                            const value = customInput.value.trim();
+                            if (value && !selectedItems.has(value)) {
+                                selectedItems.add(value);
+                                addMultiSelectTag(fieldId, value, fieldLabel);
+                            }
+                            customInput.value = '';
+                        });
+                    }
                 });
+
+                // Add submit button event listener
+                const submitButton = document.getElementById('submitCorrections');
+                if (submitButton) {
+                    submitButton.addEventListener('click', () => {
+                        submitCorrections();
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error in showDetails:", error);
+                detailsDiv.innerHTML = `<p class="error">Error loading paper details: ${error.message}</p>`;
             }
         }
         

@@ -167,6 +167,7 @@ def query():
 
 
 # Retrieve the selected paper's information.
+# Retrieve the selected paper's information.
 @app.route('/paper_details', methods=['POST'])
 def paper_details():
     data = request.get_json()
@@ -183,24 +184,27 @@ def paper_details():
     # Get consolidated data from paper_updates
     paper_updates_fresh = get_fresh_data()
     
+    # Helper function to clean values including lists
+    def clean_value(val):
+        if isinstance(val, list):
+            # Clean each item in the list
+            return [str(item) if pd.notna(item) else "N/A" for item in val]
+        elif pd.isna(val) or val is None or val == "":
+            return "N/A"
+        return str(val)
+    
     if paper_id in paper_updates_fresh:
         paper_data = paper_updates_fresh[paper_id]
-        
-        # Helper function to clean values
-        def clean_value(val):
-            if pd.isna(val) or val is None or val == "":
-                return "N/A"
-            return str(val)
         
         # Return the consolidated data
         paper_info = {
             "Title": clean_value(paper_data.get("Title")),
             "Authors": clean_value(paper_data.get("Authors")),
             "Year": clean_value(row.get("year")),
-            "GPU Number": paper_data.get("GPU Number", "N/A"),
-            "GPU Type": paper_data.get("GPU Type", "N/A"),
-            "GPU Storage": paper_data.get("GPU Storage", "N/A"),
-            "Inference Time": paper_data.get("Inference Time", "N/A"),
+            "GPU Number": clean_value(paper_data.get("GPU Number", "N/A")),
+            "GPU Type": clean_value(paper_data.get("GPU Type", "N/A")),
+            "GPU Storage": clean_value(paper_data.get("GPU Storage", "N/A")),
+            "Inference Time": clean_value(paper_data.get("Inference Time", "N/A")),
             "LLM(s) FineTuning": clean_value(paper_data.get("LLM(s) FineTuning")),
             "LLM(s) Evaluation": clean_value(paper_data.get("LLM(s) Evaluation")),
             "API Cost (USD $)": clean_value(paper_data.get("API Cost")),

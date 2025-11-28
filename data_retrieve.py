@@ -89,34 +89,76 @@ def paper_tracker(df, df_corrections):
       # Go through user-submitted corrections and update paper_info.
       if row["id"] in df_corrections["id"].values:
         matches = df_corrections[df_corrections["id"] == row["id"]]
-
-        # Get only the latest entries (rows with the most recent timestamp)
-        latest_timestamp = matches["Timestamp"].max()
-        latest_matches = matches[matches["Timestamp"] == latest_timestamp]
-
-        paper_info["Last update made by"] = latest_matches["User Name"].iloc[-1]
-        paper_info["Timestamp"] = latest_matches["Timestamp"].iloc[-1]
-        paper_info["Additional Comments"] = latest_matches["Additional Comments"].iloc[-1]
-
-        paper_info["GPU Number"] = latest_matches["GPU Number"].tolist()
-        paper_info["GPU Type"] = latest_matches["GPU Type"].tolist()
-        paper_info["GPU Storage"] = latest_matches["GPU Storage"].tolist()
-        paper_info["Inference Time"] = latest_matches["Inference Time"].tolist()
-
-        paper_info["LLM(s) FineTuning"] = latest_matches["LLM(s) FineTuning"].iloc[-1]
-        paper_info["LLM(s) Evaluation"] = latest_matches["LLM(s) Evaluation"].iloc[-1]
         
-        paper_info["API Cost"] = latest_matches["API Cost"].iloc[-1]
-        paper_info["Funding Resource"] = latest_matches["Funding Resource"].iloc[-1]
-        paper_info["Funding Type"] = latest_matches["Funding Type"].iloc[-1]
-        paper_info["Funding Amount"] = latest_matches["Funding Amount"].iloc[-1]
-
-        if latest_matches["GPU CHECKED"].iloc[-1] == "Checked":
-          paper_info["GPU Info Checked"] = "Checked"
-        if latest_matches["LLM CHECKED"].iloc[-1] == "Checked":
-          paper_info["LLM Info Checked"] = "Checked"
-        if latest_matches["Funding CHECKED"].iloc[-1] == "Checked":
-          paper_info["Funding Info Checked"] = "Checked"
+        # Sort by timestamp to process in chronological order (oldest to newest)
+        matches = matches.sort_values('Timestamp')
+        
+        # Find the latest timestamp that has GPU data
+        latest_gpu_timestamp = None
+        for _, submission in matches.iterrows():
+          gpu_num = submission["GPU Number"]
+          if pd.notna(gpu_num) and str(gpu_num).strip() not in ['', 'N/A']:
+            latest_gpu_timestamp = submission["Timestamp"]
+        
+        # Collect GPU data from all rows with the latest GPU timestamp
+        gpu_rows = []
+        if latest_gpu_timestamp:
+          gpu_submissions = matches[matches["Timestamp"] == latest_gpu_timestamp]
+          for _, submission in gpu_submissions.iterrows():
+            gpu_num = submission["GPU Number"]
+            if pd.notna(gpu_num) and str(gpu_num).strip() not in ['', 'N/A']:
+              gpu_rows.append({
+                "number": gpu_num,
+                "type": submission["GPU Type"] if pd.notna(submission["GPU Type"]) else "N/A",
+                "storage": submission["GPU Storage"] if pd.notna(submission["GPU Storage"]) else "N/A",
+                "time": submission["Inference Time"] if pd.notna(submission["Inference Time"]) else "N/A"
+              })
+        
+        # Process each submission for non-GPU fields, keeping the latest non-N/A value
+        for _, submission in matches.iterrows():
+          # Update metadata (always use latest)
+          paper_info["Last update made by"] = submission["User Name"]
+          paper_info["Timestamp"] = submission["Timestamp"]
+          
+          # Update Additional Comments if not N/A
+          if pd.notna(submission["Additional Comments"]) and str(submission["Additional Comments"]).strip() not in ['', 'N/A']:
+            paper_info["Additional Comments"] = submission["Additional Comments"]
+          
+          # Update LLM fields if not N/A
+          if pd.notna(submission["LLM(s) FineTuning"]) and str(submission["LLM(s) FineTuning"]).strip() not in ['', 'N/A']:
+            paper_info["LLM(s) FineTuning"] = submission["LLM(s) FineTuning"]
+          
+          if pd.notna(submission["LLM(s) Evaluation"]) and str(submission["LLM(s) Evaluation"]).strip() not in ['', 'N/A']:
+            paper_info["LLM(s) Evaluation"] = submission["LLM(s) Evaluation"]
+          
+          # Update API Cost if not N/A
+          if pd.notna(submission["API Cost"]) and str(submission["API Cost"]).strip() not in ['', 'N/A']:
+            paper_info["API Cost"] = submission["API Cost"]
+          
+          # Update Funding fields if not N/A
+          if pd.notna(submission["Funding Resource"]) and str(submission["Funding Resource"]).strip() not in ['', 'N/A']:
+            paper_info["Funding Resource"] = submission["Funding Resource"]
+          
+          if pd.notna(submission["Funding Type"]) and str(submission["Funding Type"]).strip() not in ['', 'N/A']:
+            paper_info["Funding Type"] = submission["Funding Type"]
+          
+          if pd.notna(submission["Funding Amount"]) and str(submission["Funding Amount"]).strip() not in ['', 'N/A']:
+            paper_info["Funding Amount"] = submission["Funding Amount"]
+          
+          # Update check flags if marked as Checked
+          if submission["GPU CHECKED"] == "Checked":
+            paper_info["GPU Info Checked"] = "Checked"
+          if submission["LLM CHECKED"] == "Checked":
+            paper_info["LLM Info Checked"] = "Checked"
+          if submission["Funding CHECKED"] == "Checked":
+            paper_info["Funding Info Checked"] = "Checked"
+        
+        # If GPU data was found, convert to lists
+        if len(gpu_rows) > 0:
+          paper_info["GPU Number"] = [str(row["number"]) for row in gpu_rows]
+          paper_info["GPU Type"] = [str(row["type"]) for row in gpu_rows]
+          paper_info["GPU Storage"] = [str(row["storage"]) for row in gpu_rows]
+          paper_info["Inference Time"] = [str(row["time"]) for row in gpu_rows]
 
       paper_dict[row["id"]] = paper_info
 

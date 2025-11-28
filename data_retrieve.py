@@ -58,6 +58,9 @@ def paper_tracker(df, df_corrections):
   '''
   paper_dict = {}
 
+  # Pre-build a set of paper IDs that have corrections (MUCH faster lookup)
+  papers_with_corrections = set(df_corrections["id"].unique())
+
   # Iterate through all rows in original data.
   for index, row in df.iterrows():
     if row["id"] not in paper_dict:
@@ -87,7 +90,7 @@ def paper_tracker(df, df_corrections):
       }
       
       # Go through user-submitted corrections and update paper_info.
-      if row["id"] in df_corrections["id"].values:
+      if row["id"] in papers_with_corrections:
         matches = df_corrections[df_corrections["id"] == row["id"]]
         
         # Sort by timestamp to process in chronological order (oldest to newest)

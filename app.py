@@ -482,7 +482,7 @@ def submit_corrections():
         ]
         corrections_tab.append_row(row)
 
-    data_cache['last_updated'] = None
+    # data_cache['last_updated'] = None
 
     return jsonify({'success': True, 'message': 'Correction submitted successfully'})
 

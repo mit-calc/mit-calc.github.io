@@ -65,7 +65,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 0;
+    padding: 1rem 1rem;
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -585,73 +585,9 @@ section h2::after {
     padding: 0 0.5rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 1200px) {
-    .people-row.grid-5 {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    .people-row.grid-6 {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .hero-subtitle {
-        font-size: 1.8rem;
-    }
-
-    .paper-header {
-        padding: 1.5rem;
-    }
-
-    .research-grid {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-
-    .people-row.grid-5,
-    .people-row.grid-6 {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1.25rem;
-    }
-
-    .person-info {
-        padding: 1.25rem;
-    }
-
-    .person-card h3 {
-        font-size: 1.2rem;
-        margin: 0 0 0.5rem 0;
-    }
-
-    .person-card .affiliation {
-        font-size: 0.9rem;
-    }
-
-    section h2 {
-        font-size: 2rem;
-    }
-
-    .paper-title {
-        font-size: 2.1rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .people-row.grid-5,
-    .people-row.grid-6 {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .person-info {
-        padding: 1rem;
-    }
-} 
-
 /* Spreadsheet data confirm */
 .search-section {
-    padding: 80px 0;
+    padding: 80px 20px 80px 20px;
     background-color: #f9fafb;
 }
 
@@ -664,26 +600,21 @@ section h2::after {
     min-height: 80vh;
     box-sizing: border-box;
     margin-top: 0;
+    gap: 1rem;
 }
 
 .left-panel {
     flex: 0 0 30%;
     padding: 2rem;
     overflow-y: auto;
+    border-right: 1px solid #ddd;
+    background-color: var(--background-light);
 }
 
 .right-panel {
     flex: 0 0 70%;
     padding: 2rem;
     overflow-y: auto;
-}
-
-.left-panel {
-    border-right: 1px solid #ddd;
-    background-color: var(--background-light);
-}
-
-.right-panel {
     background-color: #fafafa;
 }
 
@@ -694,16 +625,19 @@ section h2::after {
   padding: 10px;
 }
 
-#nameInput, .correction { /* nameInput and correction are both input text boxes - should look the same! */
-    width: 250px;
+#nameInput, .correction {
+    width: 100%;
+    max-width: 250px;
     height: 35px;
     font-size: 16px;
     padding: 8px;
     border-radius: 10px;
+    border: 1px solid #ccc;
 }
 
 #titleInput {
-    width: 250px;
+    width: 100%;
+    max-width: 250px;
     height: 35px;
     font-size: 16px;
     padding: 8px;
@@ -715,7 +649,8 @@ section h2::after {
 .search-container {
     position: relative;
     display: inline-block;
-    width: 250px;
+    width: 100%;
+    max-width: 250px;
 }
 
 .suggestions-dropdown {
@@ -759,7 +694,8 @@ section h2::after {
 
 /* Submit button for name search */
 #submitName {
-    width: 100px;
+    width: 100%;
+    max-width: 100px;
     height: 35px;
     font-size: 16px;
     padding: 8px;
@@ -768,11 +704,11 @@ section h2::after {
     align-items: center;
     color: white;
     background-color: #374c7de6;
-    border: none
+    border: none;
 }
 
 #submitName:hover {
-    background-color: #1e2c4ee6
+    background-color: #1e2c4ee6;
 }
 
 #paper-list li {
@@ -785,7 +721,7 @@ section h2::after {
 }
 
 #paper-details h3 {
-    font-size: 25 px;
+    font-size: 25px;
     text-align: center;
     margin-top: 30px;
     border-bottom: 1px solid #ccc;
@@ -793,7 +729,7 @@ section h2::after {
 }
 
 .field {
-padding: 8px;
+    padding: 8px;
 }
 
 .label, .value {
@@ -804,6 +740,8 @@ padding: 8px;
     width: 100%;
     border-collapse: collapse;
     margin: 10px 0;
+    overflow-x: auto;
+    display: block;
 }
 
 .gpu-info-table th,
@@ -811,6 +749,7 @@ padding: 8px;
     border: 1px solid #ddd;
     padding: 8px;
     text-align: left;
+    min-width: 100px;
 }
 
 .gpu-info-table th {
@@ -826,7 +765,8 @@ padding: 8px;
 }
 
 .no-gpus-button {
-    width: 250px;
+    width: 100%;
+    max-width: 250px;
     height: 35px;
     font-size: 16px;
     padding: 8px;
@@ -834,7 +774,6 @@ padding: 8px;
     margin: 10px 0;
     background-color: #f0f0f0;
     border: 1px solid #ccc;
-    border-radius: 4px;
     cursor: pointer;
 }
 
@@ -897,6 +836,8 @@ padding: 8px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    width: 100%;
+    max-width: 400px;
 }
 
 .confirm-section-btn:hover {
@@ -932,6 +873,8 @@ padding: 8px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    width: 100%;
+    max-width: 400px;
 }
 
 #submitCorrections:hover {
@@ -979,7 +922,8 @@ padding: 8px;
 }
 
 .multi-select-dropdown {
-    width: 40%;
+    width: 100%;
+    max-width: 400px;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -1002,11 +946,12 @@ padding: 8px;
 }
 
 .custom-input {
-    width: 40%;
+    flex: 1;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 14px;
+    min-width: 0;
 }
 
 .no-info-placeholder {
@@ -1128,6 +1073,8 @@ padding: 8px;
     width: 100%;
     border-collapse: collapse;
     margin-top: 0.5rem;
+    overflow-x: auto;
+    display: block;
 }
 
 .community-gpu-table th,
@@ -1135,6 +1082,7 @@ padding: 8px;
     border: 1px solid #ddd;
     padding: 8px;
     text-align: left;
+    min-width: 100px;
 }
 
 .community-gpu-table th {
@@ -1256,6 +1204,7 @@ padding: 8px;
     gap: 0.5rem;
     margin-top: 2rem;
     padding: 1rem 0;
+    flex-wrap: wrap;
 }
 
 .community-pagination button {
@@ -1316,17 +1265,428 @@ padding: 8px;
     border-color: #007bff;
 }
 
-@media (max-width: 900px) {
-    .community-split-container {
-        flex-direction: column;
+/* ================================================
+   MOBILE RESPONSIVE STYLES
+   ================================================ */
+
+/* Tablet devices (768px and below) */
+@media (max-width: 768px) {
+    /* Header adjustments */
+    .main-nav {
+        flex-wrap: wrap;
+        padding: 0.75rem 1rem;
     }
 
-    .community-left-panel {
+    .logo h1 {
+        font-size: 1.2rem;
+    }
+
+    .nav-links {
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .nav-links li {
+        font-size: 0.9rem;
+    }
+
+    /* Hero section */
+    .hero-section {
+        padding: 100px 0 30px;
+    }
+
+    .paper-title {
+        font-size: 1.8rem;
+    }
+
+    .paper-authors {
+        font-size: 0.95rem;
+    }
+
+    .paper-affiliations {
+        font-size: 0.85rem;
+    }
+
+    .paper-abstract {
+        font-size: 0.95rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.8rem;
+    }
+
+    .paper-header {
+        padding: 1.5rem;
+    }
+
+    .author-group {
+        font-size: 1rem;
+    }
+
+    .hero-abstract {
+        font-size: 1.05rem;
+    }
+
+    /* Section headers */
+    section h2 {
+        font-size: 1.8rem;
+    }
+
+    /* Research section */
+    .research-section {
+        padding: 60px 0;
+    }
+
+    .research-text {
+        font-size: 1rem;
+        padding: 0 1rem;
+    }
+
+    /* Discussion section */
+    .discussion-section {
+        padding: 60px 0;
+    }
+
+    .discussion-content {
+        font-size: 1rem;
+        padding: 0 1rem;
+    }
+
+    /* People section */
+    .people-section {
+        padding: 60px 0;
+    }
+
+    .people-row.grid-5,
+    .people-row.grid-6 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .person-info {
+        padding: 1rem;
+    }
+
+    .person-card h3 {
+        font-size: 1.1rem;
+    }
+
+    .person-card .affiliation {
+        font-size: 0.85rem;
+    }
+
+    /* Search section - CRITICAL MOBILE CHANGES */
+    .search-section {
+        padding: 100px 10px 60px 10px;
+    }
+
+    .split-container {
+        flex-direction: column;
+        min-height: auto;
+        gap: 0;
+    }
+
+    .left-panel {
+        flex: 1;
+        border-right: none;
+        border-bottom: 2px solid #ddd;
+        padding: 1.5rem 1rem;
+        overflow-y: visible;
+    }
+
+    .right-panel {
+        flex: 1;
+        padding: 1.5rem 1rem;
+        overflow-y: visible;
+    }
+
+    #searchForm {
+        padding: 5px;
+    }
+
+    #nameInput, .correction, #titleInput {
+        max-width: 100%;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    .search-container {
+        max-width: 100%;
+    }
+
+    #submitName {
+        max-width: 100%;
+    }
+
+    .label, .value {
+        font-size: 16px;
+    }
+
+    #paper-details h3 {
+        font-size: 20px;
+        margin-top: 20px;
+    }
+
+    /* GPU Table - horizontal scroll on mobile */
+    .gpu-info-table {
+        font-size: 14px;
+    }
+
+    .gpu-info-table th,
+    .gpu-info-table td {
+        padding: 6px;
+        min-width: 80px;
+    }
+
+    .no-gpus-button {
+        max-width: 100%;
+    }
+
+    .eligibility-box {
+        padding: 12px;
+        font-size: 0.9rem;
+    }
+
+    .confirm-section-btn,
+    #submitCorrections {
+        font-size: 18px;
+        padding: 12px 20px;
+        max-width: 100%;
+    }
+
+    .multi-select-dropdown {
+        max-width: 100%;
+    }
+
+    .custom-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    /* Community page */
+    .community-split-container {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 0 0.5rem;
+    }
+
+    .community-left-panel,
+    .community-right-panel {
+        flex: 1;
         max-height: none;
     }
 
     .community-right-panel {
         position: relative;
         top: 0;
+    }
+
+    .community-papers-scroll {
+        max-height: none;
+    }
+
+    .community-paper-details-content {
+        padding: 0 1rem 1rem 1rem;
+    }
+
+    .community-paper-details-content h2 {
+        font-size: 1.4rem;
+    }
+
+    .community-update-card {
+        padding: 1rem;
+    }
+
+    .community-update-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .community-gpu-table {
+        font-size: 14px;
+    }
+
+    .community-gpu-table th,
+    .community-gpu-table td {
+        padding: 6px;
+        min-width: 80px;
+    }
+}
+
+/* Small mobile devices (480px and below) */
+@media (max-width: 480px) {
+    /* Further compress header */
+    .logo h1 {
+        font-size: 1rem;
+    }
+
+    .nav-links {
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    /* Hero adjustments */
+    .paper-title {
+        font-size: 1.5rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.5rem;
+    }
+
+    .paper-header {
+        padding: 1rem;
+    }
+
+    /* Section spacing */
+    section h2 {
+        font-size: 1.5rem;
+    }
+
+    .research-section,
+    .discussion-section,
+    .people-section {
+        padding: 40px 0;
+    }
+
+    /* People grid - single column */
+    .people-row.grid-5,
+    .people-row.grid-6 {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* Search section */
+    .left-panel,
+    .right-panel {
+        padding: 1rem 0.5rem;
+    }
+
+    #paper-details h3 {
+        font-size: 18px;
+    }
+
+    .label, .value {
+        font-size: 15px;
+    }
+
+    .gpu-info-table,
+    .community-gpu-table {
+        font-size: 12px;
+    }
+
+    .gpu-info-table th,
+    .gpu-info-table td,
+    .community-gpu-table th,
+    .community-gpu-table td {
+        padding: 4px;
+        min-width: 70px;
+    }
+
+    .eligibility-box {
+        font-size: 0.85rem;
+    }
+
+    .confirm-section-btn,
+    #submitCorrections {
+        font-size: 16px;
+        padding: 10px 16px;
+    }
+
+    /* Community page */
+    .community-paper-details-content h2 {
+        font-size: 1.2rem;
+    }
+
+    .community-update-header h2 {
+        font-size: 1rem;
+    }
+
+    .community-paper-info-section h3 {
+        font-size: 1.1rem;
+    }
+
+    .community-update-card {
+        padding: 0.75rem;
+    }
+
+    .community-pagination button {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Landscape mobile orientation */
+@media (max-width: 900px) and (orientation: landscape) {
+    .hero-section {
+        padding: 90px 0 20px;
+    }
+
+    .search-section {
+        padding: 90px 10px 40px 10px;
+    }
+
+    .split-container {
+        min-height: auto;
+    }
+}
+
+/* Touch-friendly adjustments for all mobile sizes */
+@media (max-width: 768px) {
+    /* Increase tap target sizes */
+    button,
+    input,
+    select,
+    a {
+        min-height: 44px; /* Apple's recommended minimum */
+    }
+
+    .nav-links a {
+        padding: 0.75rem 0.5rem;
+    }
+
+    #paper-list li {
+        padding: 0.75rem 0;
+        margin: 0.5rem 0;
+    }
+
+    .suggestion-item {
+        padding: 12px 15px;
+    }
+
+    /* Better spacing for form elements */
+    #searchForm {
+        gap: 12px;
+    }
+
+    /* Ensure tables are scrollable without breaking layout */
+    .gpu-info-table,
+    .community-gpu-table {
+        margin: 10px 0;
+        max-width: 100%;
+    }
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-image {
+    height: 40px;
+    width: auto;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .logo-image {
+        height: 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-image {
+        height: 25px;
     }
 }

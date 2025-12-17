@@ -14,12 +14,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# # * FOR HOSTING ON RENDER *
-# creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
-# creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+# * FOR HOSTING ON RENDER *
+creds_info = json.loads(os.environ["GOOGLE_API_KEY"])
+creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
 # * FOR RUNNING LOCALLY *
-creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
+# creds = Credentials.from_service_account_file("money-all-you-need-demo-ea9c81c50eee.json", scopes=SCOPES)
 
 client = gspread.authorize(creds)
 
